@@ -52,6 +52,17 @@ export const AgentDefaultsSchema = z
     contextTokens: z.number().int().positive().optional(),
     cliBackends: z.record(z.string(), CliBackendSchema).optional(),
     memorySearch: MemorySearchSchema,
+    semanticCache: z
+      .object({
+        mode: z.union([z.literal("off"), z.literal("exact"), z.literal("semantic")]).optional(),
+        ttl: z.string().optional(),
+        maxEntries: z.number().int().positive().optional(),
+        minPromptChars: z.number().int().positive().optional(),
+        minSimilarity: z.number().min(0).max(1).optional(),
+        cacheActions: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     llmRetry: RetryConfigSchema,
     contextPruning: z
       .object({

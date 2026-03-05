@@ -45,6 +45,25 @@ export type AgentContextPruningConfig = {
   };
 };
 
+export type AgentSemanticCacheConfig = {
+  /**
+   * off: disabled
+   * exact: only exact normalized prompt matches
+   * semantic: fuzzy prompt matching by token overlap (Jaccard)
+   */
+  mode?: "off" | "exact" | "semantic";
+  /** Cache entry lifetime (duration string, default unit: minutes). */
+  ttl?: string;
+  /** Max entries kept per session key. */
+  maxEntries?: number;
+  /** Ignore very short prompts to reduce accidental matches. */
+  minPromptChars?: number;
+  /** Similarity threshold for mode=semantic (0..1). */
+  minSimilarity?: number;
+  /** Allow caching imperative/action prompts (default false). */
+  cacheActions?: boolean;
+};
+
 export type CliBackendConfig = {
   /** CLI command to execute (absolute path or on PATH). */
   command: string;
@@ -184,6 +203,8 @@ export type AgentDefaultsConfig = {
   };
   /** Vector memory search configuration (per-agent overrides supported). */
   memorySearch?: MemorySearchConfig;
+  /** Optional in-memory semantic response cache for repeated prompts. */
+  semanticCache?: AgentSemanticCacheConfig;
   /** Optional retry/backoff policy for transient LLM prompt failures (429/timeout/network). */
   llmRetry?: OutboundRetryConfig;
   /** Default thinking level when no /think directive is present. */

@@ -1092,6 +1092,32 @@ Optional retry/backoff policy for transient prompt failures (for example `429`, 
 - `Retry-After` headers are honored when provided by the upstream API.
 - Default is disabled (`attempts: 1`).
 
+### `agents.defaults.semanticCache`
+
+In-memory response cache for repeated prompts (query-fingerprinting style optimization).
+
+```json5
+{
+  agents: {
+    defaults: {
+      semanticCache: {
+        mode: "semantic", // off | exact | semantic
+        ttl: "10m",
+        maxEntries: 64,
+        minPromptChars: 12,
+        minSimilarity: 0.9,
+        cacheActions: false,
+      },
+    },
+  },
+}
+```
+
+- `exact`: hit only on exact normalized prompt match.
+- `semantic`: hit on token-overlap similarity (`minSimilarity` threshold).
+- Cache is per session key and kept in memory (clears on restart).
+- By default, imperative/action prompts are excluded (`cacheActions: false`) to avoid replaying stale action confirmations.
+
 ### Block streaming
 
 ```json5

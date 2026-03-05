@@ -105,6 +105,11 @@ import {
   setActiveEmbeddedRun,
 } from "../runs.js";
 import { buildEmbeddedSandboxInfo } from "../sandbox-info.js";
+import {
+  lookupSemanticCache,
+  resolveSemanticCacheSettings,
+  storeSemanticCacheEntry,
+} from "../semantic-cache.js";
 import { prewarmSessionFile, trackSessionManagerAccess } from "../session-manager-cache.js";
 import { prepareSessionManagerForRun } from "../session-manager-init.js";
 import { resolveEmbeddedRunSkillEntries } from "../skills-runtime.js";
@@ -828,6 +833,27 @@ function summarizeSessionContext(messages: AgentMessage[]): {
     totalImageBlocks,
     maxMessageTextChars,
   };
+}
+
+function extractAssistantPlainText(message: AgentMessage | undefined): string {
+  if (!message || message.role !== "assistant") {
+    return "";
+  }
+  const content = (message as { content?: unknown }).content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const maybeText = (block as { type?: unknown; text?: unknown }).text;
+    if (typeof maybeText === "string" && maybeText.trim()) {
+      parts.push(maybeText.trim());
+    }
+  }
+  return parts.join("\n\n").trim();
 }
 
 export async function runEmbeddedAttempt(
@@ -1660,6 +1686,9 @@ export async function runEmbeddedAttempt(
 
       // Hook runner was already obtained earlier before tool creation
       const hookAgentId = sessionAgentId;
+      const semanticCacheSettings = resolveSemanticCacheSettings(params.config);
+      let semanticCachePrompt: string | null = null;
+      let servedFromSemanticCache = false;
 
       let promptError: unknown = null;
       let promptErrorSource: "prompt" | "compaction" | null = null;
@@ -1738,6 +1767,40 @@ export async function runEmbeddedAttempt(
         }
 
         try {
+          semanticCachePrompt = effectivePrompt;
+          const semanticCacheHit = lookupSemanticCache({
+            settings: semanticCacheSettings,
+            sessionKey: sandboxSessionKey,
+            prompt: effectivePrompt,
+          });
+          if (semanticCacheHit) {
+            const cachedAssistantMessage: AgentMessage = {
+              role: "assistant",
+              content: [{ type: "text", text: semanticCacheHit.responseText }],
+              api: params.model.api ?? "openai-responses",
+              provider: params.provider,
+              model: params.modelId,
+              usage: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: 0,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              },
+              stopReason: "stop",
+              timestamp: Date.now(),
+            };
+            sessionManager.appendMessage(
+              cachedAssistantMessage as Parameters<typeof sessionManager.appendMessage>[0],
+            );
+            const sessionContext = sessionManager.buildSessionContext();
+            activeSession.agent.replaceMessages(sessionContext.messages);
+            servedFromSemanticCache = true;
+            log.info(
+              `semantic-cache hit: session=${params.sessionKey ?? params.sessionId} similarity=${semanticCacheHit.similarity.toFixed(3)}`,
+            );
+          } else {
           // Idempotent cleanup for legacy sessions with persisted image payloads.
           // Called each run; only mutates already-answered user turns that still carry image blocks.
           const didPruneImages = pruneProcessedHistoryImages(activeSession.messages);
@@ -1850,6 +1913,7 @@ export async function runEmbeddedAttempt(
               );
               await abortable(new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
             }
+          }
           }
         } catch (err) {
           promptError = err;
@@ -2013,6 +2077,26 @@ export async function runEmbeddedAttempt(
             typeof entry.toolName === "string" && entry.toolName.trim().length > 0,
         )
         .map((entry) => ({ toolName: entry.toolName, meta: entry.meta }));
+      const sentViaMessagingTool = didSendViaMessagingTool();
+
+      const assistantTextForSemanticCache = extractAssistantPlainText(lastAssistant);
+      if (
+        !servedFromSemanticCache &&
+        !aborted &&
+        !timedOut &&
+        !promptError &&
+        !sentViaMessagingTool &&
+        toolMetasNormalized.length === 0 &&
+        semanticCachePrompt &&
+        assistantTextForSemanticCache
+      ) {
+        storeSemanticCacheEntry({
+          settings: semanticCacheSettings,
+          sessionKey: sandboxSessionKey,
+          prompt: semanticCachePrompt,
+          responseText: assistantTextForSemanticCache,
+        });
+      }
 
       if (hookRunner?.hasHooks("llm_output")) {
         hookRunner
@@ -2053,7 +2137,7 @@ export async function runEmbeddedAttempt(
         toolMetas: toolMetasNormalized,
         lastAssistant,
         lastToolError: getLastToolError?.(),
-        didSendViaMessagingTool: didSendViaMessagingTool(),
+        didSendViaMessagingTool: sentViaMessagingTool,
         messagingToolSentTexts: getMessagingToolSentTexts(),
         messagingToolSentMediaUrls: getMessagingToolSentMediaUrls(),
         messagingToolSentTargets: getMessagingToolSentTargets(),
