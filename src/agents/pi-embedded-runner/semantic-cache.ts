@@ -53,7 +53,21 @@ const QUESTION_WORDS = new Set([
 const ACTION_HINT_RE =
   /(turn on|turn off|set |switch|enable|disable|start|stop|run|execute|open|close|включи|выключи|установи|запусти|останови|открой|закрой|выполни|создай|сделай)/iu;
 
-const cacheBySession = new Map<string, SemanticCacheEntry[]>();
+const cacheByScope = new Map<string, SemanticCacheEntry[]>();
+
+function buildCacheScope(params: {
+  sessionKey: string;
+  provider?: string;
+  model?: string;
+}): string | null {
+  const sessionKey = params.sessionKey.trim();
+  if (!sessionKey) {
+    return null;
+  }
+  const provider = params.provider?.trim().toLowerCase() ?? "";
+  const model = params.model?.trim().toLowerCase() ?? "";
+  return provider && model ? `${sessionKey}::${provider}/${model}` : sessionKey;
+}
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -144,6 +158,8 @@ export function resolveSemanticCacheSettings(
 export function lookupSemanticCache(params: {
   settings: SemanticCacheSettings | null;
   sessionKey: string;
+  provider?: string;
+  model?: string;
   prompt: string;
   now?: number;
 }): SemanticCacheHit | null {
@@ -151,8 +167,8 @@ export function lookupSemanticCache(params: {
   if (!settings) {
     return null;
   }
-  const sessionKey = params.sessionKey.trim();
-  if (!sessionKey) {
+  const cacheScope = buildCacheScope(params);
+  if (!cacheScope) {
     return null;
   }
   const normalizedPrompt = normalizePrompt(params.prompt);
@@ -164,10 +180,10 @@ export function lookupSemanticCache(params: {
   }
 
   const now = params.now ?? Date.now();
-  const existing = cacheBySession.get(sessionKey) ?? [];
+  const existing = cacheByScope.get(cacheScope) ?? [];
   const pruned = pruneExpiredEntries(existing, now);
   if (pruned.length !== existing.length) {
-    cacheBySession.set(sessionKey, pruned);
+    cacheByScope.set(cacheScope, pruned);
   }
   if (pruned.length === 0) {
     return null;
@@ -206,6 +222,8 @@ export function lookupSemanticCache(params: {
 export function storeSemanticCacheEntry(params: {
   settings: SemanticCacheSettings | null;
   sessionKey: string;
+  provider?: string;
+  model?: string;
   prompt: string;
   responseText: string;
   now?: number;
@@ -214,8 +232,8 @@ export function storeSemanticCacheEntry(params: {
   if (!settings) {
     return;
   }
-  const sessionKey = params.sessionKey.trim();
-  if (!sessionKey) {
+  const cacheScope = buildCacheScope(params);
+  if (!cacheScope) {
     return;
   }
   const normalizedPrompt = normalizePrompt(params.prompt);
@@ -237,7 +255,7 @@ export function storeSemanticCacheEntry(params: {
     expiresAt,
   };
 
-  const existing = cacheBySession.get(sessionKey) ?? [];
+  const existing = cacheByScope.get(cacheScope) ?? [];
   const pruned = pruneExpiredEntries(existing, now).filter(
     (entry) => entry.normalizedPrompt !== normalizedPrompt,
   );
@@ -246,9 +264,9 @@ export function storeSemanticCacheEntry(params: {
     const extra = pruned.length - settings.maxEntries;
     pruned.splice(0, extra);
   }
-  cacheBySession.set(sessionKey, pruned);
+  cacheByScope.set(cacheScope, pruned);
 }
 
 export function clearSemanticCacheForTests(): void {
-  cacheBySession.clear();
+  cacheByScope.clear();
 }

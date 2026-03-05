@@ -115,4 +115,49 @@ describe("semantic-cache", () => {
     });
     expect(hit).toBeNull();
   });
+
+  it("does not share cache hits across different models in the same session", () => {
+    const settings = resolveSemanticCacheSettings({
+      agents: {
+        defaults: {
+          semanticCache: {
+            mode: "exact",
+            minPromptChars: 1,
+          },
+        },
+      },
+    } as OpenClawConfig);
+    if (!settings) {
+      throw new Error("expected settings");
+    }
+    storeSemanticCacheEntry({
+      settings,
+      sessionKey: "agent:main:main",
+      provider: "qwen-portal",
+      model: "qwen-plus",
+      prompt: "Какая температура в спальне?",
+      responseText: "В спальне 21°C.",
+      now: 30_000,
+    });
+
+    const wrongModelHit = lookupSemanticCache({
+      settings,
+      sessionKey: "agent:main:main",
+      provider: "openai",
+      model: "gpt-5.4",
+      prompt: "Какая температура в спальне?",
+      now: 31_000,
+    });
+    expect(wrongModelHit).toBeNull();
+
+    const sameModelHit = lookupSemanticCache({
+      settings,
+      sessionKey: "agent:main:main",
+      provider: "qwen-portal",
+      model: "qwen-plus",
+      prompt: "Какая температура в спальне?",
+      now: 31_000,
+    });
+    expect(sameModelHit?.responseText).toBe("В спальне 21°C.");
+  });
 });

@@ -1771,6 +1771,8 @@ export async function runEmbeddedAttempt(
           const semanticCacheHit = lookupSemanticCache({
             settings: semanticCacheSettings,
             sessionKey: sandboxSessionKey,
+            provider: params.provider,
+            model: params.modelId,
             prompt: effectivePrompt,
           });
           if (semanticCacheHit) {
@@ -2093,6 +2095,8 @@ export async function runEmbeddedAttempt(
         storeSemanticCacheEntry({
           settings: semanticCacheSettings,
           sessionKey: sandboxSessionKey,
+          provider: params.provider,
+          model: params.modelId,
           prompt: semanticCachePrompt,
           responseText: assistantTextForSemanticCache,
         });
