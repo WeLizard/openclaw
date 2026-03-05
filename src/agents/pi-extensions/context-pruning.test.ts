@@ -176,6 +176,12 @@ describe("context-pruning", () => {
     expect(computeEffectiveSettings({})).toBeNull();
   });
 
+  it("mode always enables pruning without ttl gating", () => {
+    const settings = computeEffectiveSettings({ mode: "always" });
+    expect(settings).not.toBeNull();
+    expect(settings?.mode).toBe("always");
+  });
+
   it("does not touch tool results after the last N assistants", () => {
     const messages: AgentMessage[] = [
       makeUser("u1"),
@@ -331,6 +337,31 @@ describe("context-pruning", () => {
 
     const second = runContextHandler(handler, messages, sessionManager);
     expect(second).toBeUndefined();
+  });
+
+  it("always mode prunes on every context pass", () => {
+    const sessionManager = {};
+
+    setContextPruningRuntime(sessionManager, {
+      settings: makeAggressiveSettings({ mode: "always" }),
+      contextWindowTokens: 1000,
+      isToolPrunable: () => true,
+      lastCacheTouchAt: Date.now(),
+    });
+
+    const messages = makeSimpleToolPruningMessages();
+    const handler = createContextHandler();
+    const first = runContextHandler(handler, messages, sessionManager);
+    if (!first) {
+      throw new Error("expected first prune");
+    }
+    expect(toolText(findToolResult(first.messages, "t1"))).toBe("[cleared]");
+
+    const second = runContextHandler(handler, messages, sessionManager);
+    if (!second) {
+      throw new Error("expected second prune");
+    }
+    expect(toolText(findToolResult(second.messages, "t1"))).toBe("[cleared]");
   });
 
   it("respects tools allow/deny (deny wins; wildcards supported)", () => {

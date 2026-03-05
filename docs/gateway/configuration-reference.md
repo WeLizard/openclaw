@@ -1024,7 +1024,7 @@ Prunes **old tool results** from in-memory context before sending to the LLM. Do
   agents: {
     defaults: {
       contextPruning: {
-        mode: "cache-ttl", // off | cache-ttl
+        mode: "cache-ttl", // off | cache-ttl | always
         ttl: "1h", // duration (ms/s/m/h), default unit: minutes
         keepLastAssistants: 3,
         softTrimRatio: 0.3,
@@ -1057,7 +1057,40 @@ Notes:
 
 </Accordion>
 
+<Accordion title="always mode behavior">
+
+- `mode: "always"` runs pruning checks on every request (no TTL gate).
+- Works with any provider/model, including non-cache-aware providers.
+- `ttl` is ignored in this mode.
+- Soft-trim and hard-clear behavior is the same as `cache-ttl`.
+
+</Accordion>
+
 See [Session Pruning](/concepts/session-pruning) for behavior details.
+
+### `agents.defaults.llmRetry`
+
+Optional retry/backoff policy for transient prompt failures (for example `429`, gateway timeouts, or short network drops).
+
+```json5
+{
+  agents: {
+    defaults: {
+      llmRetry: {
+        attempts: 3,
+        minDelayMs: 500,
+        maxDelayMs: 8000,
+        jitter: 0.1,
+      },
+    },
+  },
+}
+```
+
+- Retries run only for transient failures (`rate_limit`/`timeout`) and stop on auth/billing/format errors.
+- If a stream already started emitting assistant/tool output, OpenClaw does not retry that prompt.
+- `Retry-After` headers are honored when provided by the upstream API.
+- Default is disabled (`attempts: 1`).
 
 ### Block streaming
 

@@ -44,7 +44,7 @@ import {
 } from "../../channel-tools.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
-import { isTimeoutError } from "../../failover-error.js";
+import { isTimeoutError, resolveFailoverReasonFromError } from "../../failover-error.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { normalizeProviderId, resolveDefaultModelForAgent } from "../../model-selection.js";
@@ -525,6 +525,157 @@ function wrapStreamFnDecodeXaiToolCallArguments(baseFn: StreamFn): StreamFn {
     }
     return wrapStreamDecodeXaiToolCallArguments(maybeStream);
   };
+}
+
+type LlmPromptRetryConfig = {
+  attempts: number;
+  minDelayMs: number;
+  maxDelayMs: number;
+  jitter: number;
+};
+
+const DEFAULT_LLM_PROMPT_RETRY: LlmPromptRetryConfig = {
+  attempts: 1,
+  minDelayMs: 500,
+  maxDelayMs: 10_000,
+  jitter: 0.1,
+};
+
+function clampFiniteNumber(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
+export function resolveLlmPromptRetryConfig(config?: OpenClawConfig): LlmPromptRetryConfig {
+  const raw = config?.agents?.defaults?.llmRetry;
+  const attempts = Math.round(
+    clampFiniteNumber(raw?.attempts, DEFAULT_LLM_PROMPT_RETRY.attempts, 1, 10),
+  );
+  const minDelayMs = Math.round(
+    clampFiniteNumber(raw?.minDelayMs, DEFAULT_LLM_PROMPT_RETRY.minDelayMs, 0, 120_000),
+  );
+  const maxDelayMs = Math.round(
+    clampFiniteNumber(
+      raw?.maxDelayMs,
+      Math.max(DEFAULT_LLM_PROMPT_RETRY.maxDelayMs, minDelayMs),
+      minDelayMs,
+      300_000,
+    ),
+  );
+  const jitter = clampFiniteNumber(raw?.jitter, DEFAULT_LLM_PROMPT_RETRY.jitter, 0, 1);
+  return {
+    attempts,
+    minDelayMs,
+    maxDelayMs,
+    jitter,
+  };
+}
+
+export function resolveLlmPromptRetryReason(err: unknown): "rate_limit" | "timeout" | null {
+  const reason = resolveFailoverReasonFromError(err);
+  if (reason === "rate_limit" || reason === "timeout") {
+    return reason;
+  }
+  return null;
+}
+
+function readHeaderValue(headers: unknown, name: string): unknown {
+  if (!headers || typeof headers !== "object") {
+    return undefined;
+  }
+  const lowerName = name.toLowerCase();
+  if ("get" in headers && typeof (headers as { get?: unknown }).get === "function") {
+    return (headers as { get: (key: string) => unknown }).get(name);
+  }
+  const record = headers as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key.toLowerCase() === lowerName) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function parseRetryAfterHeaderMs(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.round(value * 1_000);
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const asNumber = Number(trimmed);
+  if (Number.isFinite(asNumber) && asNumber > 0) {
+    return Math.round(asNumber * 1_000);
+  }
+  const asDate = Date.parse(trimmed);
+  if (!Number.isFinite(asDate)) {
+    return undefined;
+  }
+  return Math.max(0, asDate - Date.now());
+}
+
+export function resolveRetryAfterMsFromError(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") {
+    return undefined;
+  }
+
+  const errObj = err as Record<string, unknown>;
+  const retryAfterMs =
+    errObj.retryAfterMs ??
+    errObj.retry_after_ms ??
+    ("response" in errObj && errObj.response && typeof errObj.response === "object"
+      ? (errObj.response as Record<string, unknown>).retryAfterMs
+      : undefined);
+  if (typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    return Math.round(retryAfterMs);
+  }
+
+  const directRetryAfter = errObj.retryAfter ?? errObj.retry_after;
+  const parsedDirect = parseRetryAfterHeaderMs(directRetryAfter);
+  if (parsedDirect && parsedDirect > 0) {
+    return parsedDirect;
+  }
+
+  const responseHeaders =
+    "response" in errObj && errObj.response && typeof errObj.response === "object"
+      ? (errObj.response as Record<string, unknown>).headers
+      : undefined;
+  const headers = errObj.headers ?? responseHeaders;
+  const parsedHeader = parseRetryAfterHeaderMs(readHeaderValue(headers, "retry-after"));
+  if (parsedHeader && parsedHeader > 0) {
+    return parsedHeader;
+  }
+
+  return undefined;
+}
+
+export function computeLlmPromptRetryDelayMs(params: {
+  config: LlmPromptRetryConfig;
+  attempt: number;
+  retryAfterMs?: number;
+}): number {
+  const attempt = Math.max(1, Math.floor(params.attempt));
+  const { minDelayMs, maxDelayMs, jitter } = params.config;
+  const retryAfterMs = params.retryAfterMs;
+
+  const exponential = minDelayMs * 2 ** Math.max(0, attempt - 1);
+  const baseDelay =
+    typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.max(retryAfterMs, minDelayMs)
+      : exponential;
+  const capped = Math.min(maxDelayMs, Math.max(minDelayMs, Math.round(baseDelay)));
+  if (jitter <= 0) {
+    return capped;
+  }
+  const jitterMultiplier = 1 + (Math.random() * 2 - 1) * jitter;
+  const jittered = Math.round(capped * jitterMultiplier);
+  return Math.min(maxDelayMs, Math.max(minDelayMs, jittered));
 }
 
 export async function resolvePromptBuildHookResult(params: {
@@ -1661,12 +1812,44 @@ export async function runEmbeddedAttempt(
               });
           }
 
-          // Only pass images option if there are actually images to pass
-          // This avoids potential issues with models that don't expect the images parameter
-          if (imageResult.images.length > 0) {
-            await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
-          } else {
-            await abortable(activeSession.prompt(effectivePrompt));
+          // Retry transient provider failures (429/timeout/network) when configured.
+          const llmPromptRetry = resolveLlmPromptRetryConfig(params.config);
+          for (let promptAttempt = 1; ; promptAttempt += 1) {
+            try {
+              // Only pass images option if there are actually images to pass.
+              // This avoids potential issues with models that don't expect the images parameter.
+              if (imageResult.images.length > 0) {
+                await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
+              } else {
+                await abortable(activeSession.prompt(effectivePrompt));
+              }
+              break;
+            } catch (err) {
+              if (isRunnerAbortError(err)) {
+                throw err;
+              }
+              const retryReason = resolveLlmPromptRetryReason(err);
+              const streamingStarted = assistantTexts.length > 0 || toolMetas.length > 0;
+              const canRetry =
+                retryReason !== null &&
+                !streamingStarted &&
+                promptAttempt < llmPromptRetry.attempts;
+              if (!canRetry) {
+                throw err;
+              }
+
+              const retryAfterMs = resolveRetryAfterMsFromError(err);
+              const delayMs = computeLlmPromptRetryDelayMs({
+                config: llmPromptRetry,
+                attempt: promptAttempt,
+                retryAfterMs,
+              });
+              log.warn(
+                `embedded prompt transient failure (${retryReason}); retrying attempt ${promptAttempt + 1}/${llmPromptRetry.attempts} in ${delayMs}ms ` +
+                  `runId=${params.runId} sessionId=${params.sessionId} provider=${params.provider} model=${params.modelId}`,
+              );
+              await abortable(new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
+            }
           }
         } catch (err) {
           promptError = err;

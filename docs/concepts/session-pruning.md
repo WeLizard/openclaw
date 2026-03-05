@@ -12,10 +12,11 @@ Session pruning trims **old tool results** from the in-memory context right befo
 
 ## When it runs
 
-- When `mode: "cache-ttl"` is enabled and the last Anthropic call for the session is older than `ttl`.
+- When `mode: "always"` is enabled, pruning checks run before every LLM call.
+- When `mode: "cache-ttl"` is enabled and the last eligible cache touch is older than `ttl`.
 - Only affects the messages sent to the model for that request.
-- Only active for Anthropic API calls (and OpenRouter Anthropic models).
-- For best results, match `ttl` to your model `cacheRetention` policy (`short` = 5m, `long` = 1h).
+- `cache-ttl` mode is active only for cache-aware providers/models.
+- For best `cache-ttl` results, match `ttl` to your model `cacheRetention` policy (`short` = 5m, `long` = 1h).
 - After a prune, the TTL window resets so subsequent requests keep cache until `ttl` expires again.
 
 ## Smart defaults (Anthropic)
@@ -51,9 +52,15 @@ If `agents.defaults.contextTokens` is set, it is treated as a cap (min) on the r
 
 ## Mode
 
+### always
+
+- Pruning runs on every request.
+- Works for any provider/model (including non-cache-aware routes).
+- `ttl` is ignored in this mode.
+
 ### cache-ttl
 
-- Pruning only runs if the last Anthropic call is older than `ttl` (default `5m`).
+- Pruning only runs if the last eligible cache touch is older than `ttl` (default `5m`).
 - When it runs: same soft-trim + hard-clear behavior as before.
 
 ## Soft vs hard pruning
@@ -100,6 +107,14 @@ Enable TTL-aware pruning:
 ```json5
 {
   agents: { defaults: { contextPruning: { mode: "cache-ttl", ttl: "5m" } } },
+}
+```
+
+Enable provider-agnostic pruning:
+
+```json5
+{
+  agents: { defaults: { contextPruning: { mode: "always" } } },
 }
 ```
 

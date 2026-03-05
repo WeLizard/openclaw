@@ -11,6 +11,7 @@ import {
   BlockStreamingCoalesceSchema,
   CliBackendSchema,
   HumanDelaySchema,
+  RetryConfigSchema,
   TypingModeSchema,
 } from "./zod-schema.core.js";
 
@@ -51,9 +52,10 @@ export const AgentDefaultsSchema = z
     contextTokens: z.number().int().positive().optional(),
     cliBackends: z.record(z.string(), CliBackendSchema).optional(),
     memorySearch: MemorySearchSchema,
+    llmRetry: RetryConfigSchema,
     contextPruning: z
       .object({
-        mode: z.union([z.literal("off"), z.literal("cache-ttl")]).optional(),
+        mode: z.union([z.literal("off"), z.literal("cache-ttl"), z.literal("always")]).optional(),
         ttl: z.string().optional(),
         keepLastAssistants: z.number().int().nonnegative().optional(),
         softTrimRatio: z.number().min(0).max(1).optional(),

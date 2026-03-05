@@ -4,6 +4,7 @@ import type {
   BlockStreamingChunkConfig,
   BlockStreamingCoalesceConfig,
   HumanDelayConfig,
+  OutboundRetryConfig,
   TypingMode,
 } from "./types.base.js";
 import type { MemorySearchConfig } from "./types.tools.js";
@@ -22,7 +23,7 @@ export type AgentModelListConfig = {
 };
 
 export type AgentContextPruningConfig = {
-  mode?: "off" | "cache-ttl";
+  mode?: "off" | "cache-ttl" | "always";
   /** TTL to consider cache expired (duration string, default unit: minutes). */
   ttl?: string;
   keepLastAssistants?: number;
@@ -183,6 +184,8 @@ export type AgentDefaultsConfig = {
   };
   /** Vector memory search configuration (per-agent overrides supported). */
   memorySearch?: MemorySearchConfig;
+  /** Optional retry/backoff policy for transient LLM prompt failures (429/timeout/network). */
+  llmRetry?: OutboundRetryConfig;
   /** Default thinking level when no /think directive is present. */
   thinkingDefault?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
   /** Default verbose level when no /verbose directive is present. */

@@ -35,10 +35,11 @@ function buildContextPruningFactory(params: {
   model: Model<Api> | undefined;
 }): ExtensionFactory | undefined {
   const raw = params.cfg?.agents?.defaults?.contextPruning;
-  if (raw?.mode !== "cache-ttl") {
+  const mode = raw?.mode;
+  if (mode !== "cache-ttl" && mode !== "always") {
     return undefined;
   }
-  if (!isCacheTtlEligibleProvider(params.provider, params.modelId)) {
+  if (mode === "cache-ttl" && !isCacheTtlEligibleProvider(params.provider, params.modelId)) {
     return undefined;
   }
 
