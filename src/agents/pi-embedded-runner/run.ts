@@ -54,6 +54,7 @@ import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
 import { resolveModel } from "./model.js";
+import { resolveRequestOptimization } from "./request-optimization.js";
 import { runEmbeddedAttempt } from "./run/attempt.js";
 import type { RunEmbeddedPiAgentParams } from "./run/params.js";
 import { buildEmbeddedRunPayloads } from "./run/payloads.js";
@@ -341,12 +342,41 @@ export async function runEmbeddedPiAgent(
         log.info(`[hooks] model overridden to ${modelId}`);
       }
 
-      const { model, error, authStorage, modelRegistry } = resolveModel(
+      const baseProvider = provider;
+      const baseModelId = modelId;
+      const optimization = resolveRequestOptimization({
+        prompt: params.prompt,
         provider,
-        modelId,
-        agentDir,
-        params.config,
-      );
+        model: modelId,
+        config: params.config,
+      });
+      const optimizedPrompt = optimization.prompt;
+      if (
+        optimization.route.tier === 3 &&
+        (optimization.route.provider !== provider || optimization.route.model !== modelId)
+      ) {
+        provider = optimization.route.provider;
+        modelId = optimization.route.model;
+        log.info(
+          `[token-optimization] routed request to tier=${optimization.route.tier} model=${provider}/${modelId} ` +
+            `reason=${optimization.route.reason} score=${optimization.complexityScore.toFixed(2)}`,
+        );
+      } else if (optimization.notes.length > 0 && log.isEnabled("debug")) {
+        log.debug(
+          `[token-optimization] score=${optimization.complexityScore.toFixed(2)} notes=${optimization.notes.join(",")}`,
+        );
+      }
+
+      let modelResolution = resolveModel(provider, modelId, agentDir, params.config);
+      if (!modelResolution.model && optimization.route.tier === 3) {
+        log.warn(
+          `[token-optimization] tier-3 model not found (${provider}/${modelId}); falling back to base ${baseProvider}/${baseModelId}`,
+        );
+        provider = baseProvider;
+        modelId = baseModelId;
+        modelResolution = resolveModel(provider, modelId, agentDir, params.config);
+      }
+      const { model, error, authStorage, modelRegistry } = modelResolution;
       if (!model) {
         throw new FailoverError(error ?? `Unknown model: ${provider}/${modelId}`, {
           reason: "model_not_found",
@@ -757,7 +787,9 @@ export async function runEmbeddedPiAgent(
           await fs.mkdir(resolvedWorkspace, { recursive: true });
 
           const prompt =
-            provider === "anthropic" ? scrubAnthropicRefusalMagic(params.prompt) : params.prompt;
+            provider === "anthropic"
+              ? scrubAnthropicRefusalMagic(optimizedPrompt)
+              : optimizedPrompt;
 
           const attempt = await runEmbeddedAttempt({
             sessionId: params.sessionId,

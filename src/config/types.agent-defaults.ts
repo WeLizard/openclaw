@@ -64,6 +64,65 @@ export type AgentSemanticCacheConfig = {
   cacheActions?: boolean;
 };
 
+export type AgentRequestCascadeConfig = {
+  /**
+   * off: disabled
+   * auto: route simple requests to a cheaper model when configured
+   */
+  mode?: "off" | "auto";
+  /** Optional cheaper model for Tier-3 routing (provider/model). */
+  cheapModel?: string;
+  /** Max prompt length treated as a simple request candidate. */
+  simplePromptChars?: number;
+  /** Min prompt length treated as complex (forced Tier-4). */
+  complexPromptChars?: number;
+  /** Max intent-complexity score to route into Tier-3. */
+  simpleScoreThreshold?: number;
+};
+
+export type AgentPromptPlannerConfig = {
+  /**
+   * off: disabled
+   * auto: inject hints only when detected
+   * always: always inject planning hints
+   */
+  mode?: "off" | "auto" | "always";
+  /** Encourage batching related actions in one turn. */
+  batching?: boolean;
+  /** Encourage decomposition of complex asks into subtasks. */
+  decomposition?: boolean;
+  /** Complexity score threshold to trigger decomposition hints in auto mode. */
+  decomposeScoreThreshold?: number;
+  /** Upper bound for requested subtask count in planning hints. */
+  maxSubtasks?: number;
+};
+
+export type AgentInputStructuringConfig = {
+  /** Enable lightweight prompt/input structuring before model call. */
+  enabled?: boolean;
+  /** Collapse repeated whitespace and blank lines. */
+  collapseWhitespace?: boolean;
+  /** Remove repeated consecutive lines (long-enough lines only). */
+  dedupeLines?: boolean;
+  /** Maximum blank lines to keep in a row. */
+  maxConsecutiveBlankLines?: number;
+  /** Minimum line length for consecutive duplicate removal. */
+  minDuplicateLineChars?: number;
+  /** Detect and pack dense Home Assistant-like state lines into compact JSON. */
+  parseStateLines?: boolean;
+  /** Minimum detected state lines required before packing. */
+  minStateLines?: number;
+};
+
+export type AgentTokenOptimizationConfig = {
+  /** Tiered routing and cheap-model cascade behavior. */
+  cascade?: AgentRequestCascadeConfig;
+  /** Prompt-level planning hints (batching/decomposition). */
+  planner?: AgentPromptPlannerConfig;
+  /** Input normalization and lightweight structuring. */
+  inputStructuring?: AgentInputStructuringConfig;
+};
+
 export type CliBackendConfig = {
   /** CLI command to execute (absolute path or on PATH). */
   command: string;
@@ -205,6 +264,8 @@ export type AgentDefaultsConfig = {
   memorySearch?: MemorySearchConfig;
   /** Optional in-memory semantic response cache for repeated prompts. */
   semanticCache?: AgentSemanticCacheConfig;
+  /** Hierarchical token-efficiency controls: routing, planning, input structuring. */
+  tokenOptimization?: AgentTokenOptimizationConfig;
   /** Optional retry/backoff policy for transient LLM prompt failures (429/timeout/network). */
   llmRetry?: OutboundRetryConfig;
   /** Default thinking level when no /think directive is present. */

@@ -1118,6 +1118,52 @@ In-memory response cache for repeated prompts (query-fingerprinting style optimi
 - Cache is per session key and kept in memory (clears on restart).
 - By default, imperative/action prompts are excluded (`cacheActions: false`) to avoid replaying stale action confirmations.
 
+### `agents.defaults.tokenOptimization`
+
+Hierarchical token-efficiency controls for request routing, prompt planning hints, and input structuring.
+
+```json5
+{
+  agents: {
+    defaults: {
+      tokenOptimization: {
+        cascade: {
+          mode: "auto", // off | auto
+          cheapModel: "qwen/qwen3-8b",
+          simplePromptChars: 220,
+          complexPromptChars: 900,
+          simpleScoreThreshold: 2.5,
+        },
+        planner: {
+          mode: "auto", // off | auto | always
+          batching: true,
+          decomposition: true,
+          decomposeScoreThreshold: 4,
+          maxSubtasks: 8,
+        },
+        inputStructuring: {
+          enabled: true,
+          collapseWhitespace: true,
+          dedupeLines: true,
+          parseStateLines: true,
+          minStateLines: 5,
+        },
+      },
+    },
+  },
+}
+```
+
+- `cascade` implements Tier-3/Tier-4 routing:
+  - simple requests can be routed to `cheapModel` (Tier-3),
+  - complex requests stay on your primary model (Tier-4).
+- `planner` injects compact planning hints to reduce multi-step/tool-loop churn:
+  - batch related actions in one turn,
+  - decompose complex asks into explicit subtasks.
+- `inputStructuring` trims noisy prompts:
+  - collapses whitespace and repeated lines,
+  - packs dense `entity_id: value` state dumps into a compact snapshot block.
+
 ### Block streaming
 
 ```json5
