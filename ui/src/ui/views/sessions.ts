@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { t } from "../../i18n/index.ts";
 import { formatRelativeTimestamp } from "../format.ts";
 import { resolveModelRef } from "../model-utils.ts";
 import { pathForTab } from "../navigation.ts";
@@ -37,12 +38,7 @@ export type SessionsProps = {
 
 const THINK_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
 const BINARY_THINK_LEVELS = ["", "off", "on"] as const;
-const VERBOSE_LEVELS = [
-  { value: "", label: "inherit" },
-  { value: "off", label: "off (explicit)" },
-  { value: "on", label: "on" },
-  { value: "full", label: "full" },
-] as const;
+const VERBOSE_LEVELS = ["", "off", "on", "full"] as const;
 const REASONING_LEVELS = ["", "off", "on", "stream"] as const;
 
 function renderSuggestionList(id: string, options: string[]) {
@@ -84,19 +80,6 @@ function withCurrentOption(options: readonly string[], current: string): string[
   return [...options, current];
 }
 
-function withCurrentLabeledOption(
-  options: readonly { value: string; label: string }[],
-  current: string,
-): Array<{ value: string; label: string }> {
-  if (!current) {
-    return [...options];
-  }
-  if (options.some((option) => option.value === current)) {
-    return [...options];
-  }
-  return [...options, { value: current, label: `${current} (custom)` }];
-}
-
 function resolveThinkLevelDisplay(value: string, isBinary: boolean): string {
   if (!isBinary) {
     return value;
@@ -120,6 +103,22 @@ function resolveThinkLevelPatchValue(value: string, isBinary: boolean): string |
   return value;
 }
 
+function resolveVerboseLabel(value: string): string {
+  if (!value) {
+    return t("common.inherit");
+  }
+  if (value === "off") {
+    return t("sessions.verboseOffExplicit");
+  }
+  if (value === "on") {
+    return t("sessions.verboseOn");
+  }
+  if (value === "full") {
+    return t("sessions.verboseFull");
+  }
+  return t("sessions.customValue", { value });
+}
+
 export function renderSessions(props: SessionsProps) {
   const rows = props.result?.sessions ?? [];
   const defaultModelRef = resolveModelRef(
@@ -130,17 +129,17 @@ export function renderSessions(props: SessionsProps) {
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <div class="card-title">Sessions</div>
-          <div class="card-sub">Active session keys and per-session overrides.</div>
+          <div class="card-title">${t("sessions.title")}</div>
+          <div class="card-sub">${t("sessions.subtitle")}</div>
         </div>
         <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
-          ${props.loading ? "Loading…" : "Refresh"}
+          ${props.loading ? t("common.loading") : t("common.refresh")}
         </button>
       </div>
 
       <div class="filters" style="margin-top: 14px;">
         <label class="field">
-          <span>Active within (minutes)</span>
+          <span>${t("sessions.filters.activeWithinMinutes")}</span>
           <input
             .value=${props.activeMinutes}
             @input=${(e: Event) =>
@@ -153,7 +152,7 @@ export function renderSessions(props: SessionsProps) {
           />
         </label>
         <label class="field">
-          <span>Limit</span>
+          <span>${t("sessions.filters.limit")}</span>
           <input
             .value=${props.limit}
             @input=${(e: Event) =>
@@ -166,7 +165,7 @@ export function renderSessions(props: SessionsProps) {
           />
         </label>
         <label class="field checkbox">
-          <span>Include global</span>
+          <span>${t("sessions.filters.includeGlobal")}</span>
           <input
             type="checkbox"
             .checked=${props.includeGlobal}
@@ -180,7 +179,7 @@ export function renderSessions(props: SessionsProps) {
           />
         </label>
         <label class="field checkbox">
-          <span>Include unknown</span>
+          <span>${t("sessions.filters.includeUnknown")}</span>
           <input
             type="checkbox"
             .checked=${props.includeUnknown}
@@ -202,26 +201,26 @@ export function renderSessions(props: SessionsProps) {
       }
 
       <div class="muted" style="margin-top: 12px;">
-        ${props.result ? `Store: ${props.result.path}` : ""}
+        ${props.result ? t("sessions.storePath", { path: props.result.path }) : ""}
       </div>
 
       <div class="table" style="margin-top: 16px;">
         <div class="table-head">
-          <div>Key</div>
-          <div>Label</div>
-          <div>Kind</div>
-          <div>Updated</div>
-          <div>Tokens</div>
-          <div>Model</div>
-          <div>Thinking</div>
-          <div>Verbose</div>
-          <div>Reasoning</div>
-          <div>Actions</div>
+          <div>${t("sessions.table.key")}</div>
+          <div>${t("sessions.table.label")}</div>
+          <div>${t("sessions.table.kind")}</div>
+          <div>${t("sessions.table.updated")}</div>
+          <div>${t("sessions.table.tokens")}</div>
+          <div>${t("sessions.table.model")}</div>
+          <div>${t("sessions.table.thinking")}</div>
+          <div>${t("sessions.table.verbose")}</div>
+          <div>${t("sessions.table.reasoning")}</div>
+          <div>${t("sessions.table.actions")}</div>
         </div>
         ${
           rows.length === 0
             ? html`
-                <div class="muted">No sessions found.</div>
+                <div class="muted">${t("sessions.empty")}</div>
               `
             : rows.map((row) =>
                 renderRow(
@@ -248,13 +247,13 @@ function renderRow(
   disabled: boolean,
   defaultModelRef: string,
 ) {
-  const updated = row.updatedAt ? formatRelativeTimestamp(row.updatedAt) : "n/a";
+  const updated = row.updatedAt ? formatRelativeTimestamp(row.updatedAt) : t("common.na");
   const rawThinking = row.thinkingLevel ?? "";
   const isBinaryThinking = isBinaryThinkingProvider(row.modelProvider);
   const thinking = resolveThinkLevelDisplay(rawThinking, isBinaryThinking);
   const thinkLevels = withCurrentOption(resolveThinkLevelOptions(row.modelProvider), thinking);
   const verbose = row.verboseLevel ?? "";
-  const verboseLevels = withCurrentLabeledOption(VERBOSE_LEVELS, verbose);
+  const verboseLevels = withCurrentOption(VERBOSE_LEVELS, verbose);
   const reasoning = row.reasoningLevel ?? "";
   const reasoningLevels = withCurrentOption(REASONING_LEVELS, reasoning);
   const displayName =
@@ -283,7 +282,7 @@ function renderRow(
         <input
           .value=${row.label ?? ""}
           ?disabled=${disabled}
-          placeholder="(optional)"
+          placeholder=${t("sessions.optionalPlaceholder")}
           @change=${(e: Event) => {
             const value = (e.target as HTMLInputElement).value.trim();
             onPatch(row.key, { label: value || null });
@@ -299,8 +298,8 @@ function renderRow(
             .value=${currentModelRef}
             list="sessions-model-suggestions"
             ?disabled=${disabled}
-            placeholder=${defaultModelRef || "provider/model"}
-            title=${currentModelRef || defaultModelRef || "Gateway default"}
+            placeholder=${defaultModelRef || t("sessions.modelPlaceholder")}
+            title=${currentModelRef || defaultModelRef || t("sessions.gatewayDefault")}
             @change=${(e: Event) => {
               const value = (e.target as HTMLInputElement).value.trim();
               onPatch(row.key, { model: value || null });
@@ -311,17 +310,17 @@ function renderRow(
             ?disabled=${disabled || usingDefaultModel}
             @click=${() => onPatch(row.key, { model: null })}
           >
-            Default
+            ${t("sessions.useDefault")}
           </button>
         </div>
         <div class="muted session-model-meta">
           ${usingDefaultModel
             ? defaultModelRef
-              ? `Default · ${defaultModelRef}`
-              : "Gateway default"
+              ? t("sessions.defaultModel", { model: defaultModelRef })
+              : t("sessions.gatewayDefault")
             : currentModelRef
-              ? `Active · ${currentModelRef}`
-              : "Gateway default"}
+              ? t("sessions.activeModel", { model: currentModelRef })
+              : t("sessions.gatewayDefault")}
         </div>
       </div>
       <div>
@@ -337,7 +336,7 @@ function renderRow(
           ${thinkLevels.map(
             (level) =>
               html`<option value=${level} ?selected=${thinking === level}>
-                ${level || "inherit"}
+                ${level || t("common.inherit")}
               </option>`,
           )}
         </select>
@@ -352,8 +351,8 @@ function renderRow(
         >
           ${verboseLevels.map(
             (level) =>
-              html`<option value=${level.value} ?selected=${verbose === level.value}>
-                ${level.label}
+              html`<option value=${level} ?selected=${verbose === level}>
+                ${resolveVerboseLabel(level)}
               </option>`,
           )}
         </select>
@@ -369,14 +368,14 @@ function renderRow(
           ${reasoningLevels.map(
             (level) =>
               html`<option value=${level} ?selected=${reasoning === level}>
-                ${level || "inherit"}
+                ${level || t("common.inherit")}
               </option>`,
           )}
         </select>
       </div>
       <div>
         <button class="btn danger" ?disabled=${disabled} @click=${() => onDelete(row.key)}>
-          Delete
+          ${t("common.delete")}
         </button>
       </div>
     </div>
