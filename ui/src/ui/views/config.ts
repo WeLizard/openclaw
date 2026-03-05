@@ -330,7 +330,10 @@ function resolveSectionMeta(
 } {
   const meta = SECTION_META[key];
   if (meta) {
-    return meta;
+    return {
+      label: meta.labelKey ? t(meta.labelKey) : meta.label,
+      description: meta.descriptionKey ? t(meta.descriptionKey) : meta.description,
+    };
   }
   return {
     label: schema?.title ?? humanize(key),
