@@ -10,11 +10,7 @@ type LazyLocaleRegistration = {
 
 export const DEFAULT_LOCALE: Locale = "en";
 
-<<<<<<< HEAD
 const LAZY_LOCALES: readonly LazyLocale[] = ["zh-CN", "zh-TW", "pt-BR", "de", "es", "ru"];
-=======
-const LAZY_LOCALES: readonly LazyLocale[] = ["zh-CN", "zh-TW", "pt-BR", "de", "ru"];
->>>>>>> e83c33dee (feat(i18n): add Russian (ru) localization for Gateway Dashboard)
 
 const LAZY_LOCALE_REGISTRY: Record<LazyLocale, LazyLocaleRegistration> = {
   "zh-CN": {
@@ -63,7 +59,6 @@ export function resolveNavigatorLocale(navLang: string): Locale {
   if (navLang.startsWith("de")) {
     return "de";
   }
-<<<<<<< HEAD
   if (navLang.startsWith("ru")) {
     return "ru";
   }
