@@ -2263,6 +2263,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   animation: scale-in 0.2s var(--ease-out);
 }
 
@@ -2341,8 +2345,21 @@
   width: min(720px, 100%);
 }
 
+.wizard-body {
+  margin-top: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
 .wizard-step {
   margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .wizard-step-title {
@@ -2361,6 +2378,12 @@
 .wizard-option-list {
   display: grid;
   gap: 10px;
+  min-height: 0;
+  max-height: min(56vh, 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .wizard-option {
@@ -2408,6 +2431,23 @@
   background: var(--secondary);
   color: var(--muted);
   line-height: 1.6;
+}
+
+.wizard-actions {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+@media (max-height: 760px) {
+  .wizard-card {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .wizard-option-list {
+    max-height: min(38dvh, 280px);
+  }
 }
 
 /* ===========================================

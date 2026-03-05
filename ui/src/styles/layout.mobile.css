@@ -214,10 +214,19 @@
   .wizard-card {
     width: 100%;
     padding: 14px;
+    max-height: calc(100dvh - 24px);
   }
 
   .wizard-option {
     padding: 10px 12px;
+  }
+
+  .wizard-body {
+    max-height: none;
+  }
+
+  .wizard-option-list {
+    max-height: min(42dvh, 280px);
   }
 
   /* Pills */
