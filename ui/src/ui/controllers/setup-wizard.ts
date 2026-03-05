@@ -3,6 +3,13 @@ import type { WizardNextResult, WizardStartResult, WizardStep } from "../types.t
 
 export type SetupWizardMode = "local" | "remote";
 export type SetupWizardStatus = WizardStartResult["status"] | null;
+export type SetupWizardIntent = "onboarding" | "models-auth-login";
+
+export type StartSetupWizardOptions = {
+  intent?: SetupWizardIntent;
+  provider?: string | null;
+  oauthOnly?: boolean;
+};
 
 export type SetupWizardState = {
   client: GatewayBrowserClient | null;
@@ -11,6 +18,8 @@ export type SetupWizardState = {
   wizardLoading: boolean;
   wizardBusy: boolean;
   wizardMode: SetupWizardMode;
+  wizardIntent: SetupWizardIntent;
+  wizardContextLabel: string | null;
   wizardSessionId: string | null;
   wizardStatus: SetupWizardStatus;
   wizardError: string | null;
@@ -63,6 +72,8 @@ function resetWizardState(state: SetupWizardState) {
   state.wizardOpen = false;
   state.wizardLoading = false;
   state.wizardBusy = false;
+  state.wizardIntent = "onboarding";
+  state.wizardContextLabel = null;
   state.wizardSessionId = null;
   state.wizardStatus = null;
   state.wizardError = null;
@@ -78,14 +89,26 @@ export function dismissSetupWizard(state: SetupWizardState) {
   resetWizardState(state);
 }
 
-export async function startSetupWizard(state: SetupWizardState, mode: SetupWizardMode) {
+export async function startSetupWizard(
+  state: SetupWizardState,
+  mode: SetupWizardMode,
+  options?: StartSetupWizardOptions,
+) {
   if (!state.client || !state.connected || state.wizardLoading || state.wizardBusy) {
     return;
+  }
+  const providerLabel =
+    typeof options?.provider === "string" ? options.provider.trim() : "";
+  const contextParts = [providerLabel];
+  if (options?.oauthOnly) {
+    contextParts.push("oauth");
   }
   state.wizardOpen = true;
   state.wizardLoading = true;
   state.wizardBusy = false;
   state.wizardMode = mode;
+  state.wizardIntent = options?.intent ?? "onboarding";
+  state.wizardContextLabel = contextParts.filter(Boolean).join(" · ") || null;
   state.wizardSessionId = null;
   state.wizardStatus = "running";
   state.wizardError = null;
