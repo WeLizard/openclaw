@@ -347,6 +347,12 @@ export const validateModelsAuthOrderClearParams =
 export const validateModelsAuthCooldownClearParams =
   ajv.compile<ModelsAuthCooldownClearParams>(ModelsAuthCooldownClearParamsSchema);
 export const validateModelsListParams = ajv.compile<ModelsListParams>(ModelsListParamsSchema);
+export const validateModelsAuthProfileDisableParams =
+  ajv.compile<ModelsAuthProfileDisableParams>(ModelsAuthProfileDisableParamsSchema);
+export const validateModelsAuthProfileEnableParams =
+  ajv.compile<ModelsAuthProfileEnableParams>(ModelsAuthProfileEnableParamsSchema);
+export const validateModelsAuthProfileDeleteParams =
+  ajv.compile<ModelsAuthProfileDeleteParams>(ModelsAuthProfileDeleteParamsSchema);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);
 export const validateToolsCatalogParams = ajv.compile<ToolsCatalogParams>(ToolsCatalogParamsSchema);
 export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBinsParamsSchema);
@@ -519,6 +525,9 @@ export {
   ModelsAuthPromoteParamsSchema,
   ModelsAuthOrderClearParamsSchema,
   ModelsAuthCooldownClearParamsSchema,
+  ModelsAuthProfileDisableParamsSchema,
+  ModelsAuthProfileEnableParamsSchema,
+  ModelsAuthProfileDeleteParamsSchema,
   ModelsListParamsSchema,
   SkillsStatusParamsSchema,
   ToolsCatalogParamsSchema,

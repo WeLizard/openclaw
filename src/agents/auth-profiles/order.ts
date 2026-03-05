@@ -20,7 +20,8 @@ export type AuthProfileEligibilityReasonCode =
   | AuthCredentialReasonCode
   | "profile_missing"
   | "provider_mismatch"
-  | "mode_mismatch";
+  | "mode_mismatch"
+  | "manual_disabled";
 
 export type AuthProfileEligibility = {
   eligible: boolean;
@@ -53,6 +54,16 @@ export function resolveAuthProfileEligibility(params: {
         return { eligible: false, reasonCode: "mode_mismatch" };
       }
     }
+  }
+  const usageStats = params.store.usageStats?.[params.profileId];
+  if (
+    usageStats?.disabledReason === "manual" &&
+    typeof usageStats.disabledUntil === "number" &&
+    Number.isFinite(usageStats.disabledUntil) &&
+    usageStats.disabledUntil > 0 &&
+    (params.now ?? Date.now()) < usageStats.disabledUntil
+  ) {
+    return { eligible: false, reasonCode: "manual_disabled" };
   }
   const credentialEligibility = evaluateStoredCredentialEligibility({
     credential: cred,
