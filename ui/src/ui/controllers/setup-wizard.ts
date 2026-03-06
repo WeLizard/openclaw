@@ -20,6 +20,8 @@ export type SetupWizardState = {
   wizardBusy: boolean;
   wizardMode: SetupWizardMode;
   wizardIntent: SetupWizardIntent;
+  wizardProvider: string | null;
+  wizardOauthOnly: boolean;
   wizardContextLabel: string | null;
   wizardSessionId: string | null;
   wizardStatus: SetupWizardStatus;
@@ -33,6 +35,8 @@ type PersistedSetupWizardState = {
   sessionId: string;
   mode: SetupWizardMode;
   intent: SetupWizardIntent;
+  provider: string | null;
+  oauthOnly: boolean;
   contextLabel: string | null;
 };
 
@@ -61,12 +65,56 @@ function readPersistedSetupWizardState(): PersistedSetupWizardState | null {
       sessionId: parsed.sessionId,
       mode: parsed.mode,
       intent: parsed.intent,
+      provider: typeof parsed.provider === "string" && parsed.provider.trim() ? parsed.provider : null,
+      oauthOnly: parsed.oauthOnly === true,
       contextLabel: typeof parsed.contextLabel === "string" ? parsed.contextLabel : null,
     };
   } catch {
     localStorage.removeItem(SETUP_WIZARD_STORAGE_KEY);
     return null;
   }
+}
+
+function normalizeProvider(provider: string | null | undefined): string | null {
+  const value = typeof provider === "string" ? provider.trim() : "";
+  return value ? value : null;
+}
+
+function resolveWizardRequest(
+  mode: SetupWizardMode,
+  options?: StartSetupWizardOptions,
+): {
+  mode: SetupWizardMode;
+  intent: SetupWizardIntent;
+  provider: string | null;
+  oauthOnly: boolean;
+  contextLabel: string | null;
+} {
+  const provider = normalizeProvider(options?.provider);
+  const oauthOnly = options?.oauthOnly === true;
+  const contextParts = [provider];
+  if (oauthOnly) {
+    contextParts.push("oauth");
+  }
+  return {
+    mode,
+    intent: options?.intent ?? "onboarding",
+    provider,
+    oauthOnly,
+    contextLabel: contextParts.filter(Boolean).join(" · ") || null,
+  };
+}
+
+function matchesPersistedWizardRequest(
+  persisted: PersistedSetupWizardState,
+  requested: ReturnType<typeof resolveWizardRequest>,
+): boolean {
+  return (
+    persisted.mode === requested.mode &&
+    persisted.intent === requested.intent &&
+    normalizeProvider(persisted.provider) === requested.provider &&
+    Boolean(persisted.oauthOnly) === requested.oauthOnly
+  );
 }
 
 function persistSetupWizardState(state: SetupWizardState) {
@@ -77,6 +125,8 @@ function persistSetupWizardState(state: SetupWizardState) {
     sessionId: state.wizardSessionId,
     mode: state.wizardMode,
     intent: state.wizardIntent,
+    provider: normalizeProvider(state.wizardProvider),
+    oauthOnly: state.wizardOauthOnly === true,
     contextLabel: state.wizardContextLabel,
   };
   localStorage.setItem(SETUP_WIZARD_STORAGE_KEY, JSON.stringify(payload));
@@ -139,6 +189,8 @@ function resetWizardState(state: SetupWizardState) {
   state.wizardLoading = false;
   state.wizardBusy = false;
   state.wizardIntent = "onboarding";
+  state.wizardProvider = null;
+  state.wizardOauthOnly = false;
   state.wizardContextLabel = null;
   state.wizardSessionId = null;
   state.wizardStatus = null;
@@ -147,7 +199,10 @@ function resetWizardState(state: SetupWizardState) {
   state.wizardDraftValue = null;
 }
 
-async function resumePersistedSetupWizard(state: SetupWizardState): Promise<boolean> {
+async function resumePersistedSetupWizard(
+  state: SetupWizardState,
+  requested?: ReturnType<typeof resolveWizardRequest>,
+): Promise<boolean> {
   if (!state.client || !state.connected) {
     return false;
   }
@@ -155,11 +210,16 @@ async function resumePersistedSetupWizard(state: SetupWizardState): Promise<bool
   if (!persisted) {
     return false;
   }
+  if (requested && !matchesPersistedWizardRequest(persisted, requested)) {
+    return false;
+  }
   state.wizardOpen = true;
   state.wizardLoading = true;
   state.wizardBusy = false;
   state.wizardMode = persisted.mode;
   state.wizardIntent = persisted.intent;
+  state.wizardProvider = persisted.provider;
+  state.wizardOauthOnly = persisted.oauthOnly;
   state.wizardContextLabel = persisted.contextLabel;
   state.wizardSessionId = persisted.sessionId;
   state.wizardStatus = "running";
@@ -197,22 +257,19 @@ export async function startSetupWizard(
   if (!state.client || !state.connected || state.wizardLoading || state.wizardBusy) {
     return;
   }
-  const restored = await resumePersistedSetupWizard(state);
+  const requested = resolveWizardRequest(mode, options);
+  const restored = await resumePersistedSetupWizard(state, requested);
   if (restored) {
     return;
-  }
-  const providerLabel =
-    typeof options?.provider === "string" ? options.provider.trim() : "";
-  const contextParts = [providerLabel];
-  if (options?.oauthOnly) {
-    contextParts.push("oauth");
   }
   state.wizardOpen = true;
   state.wizardLoading = true;
   state.wizardBusy = false;
-  state.wizardMode = mode;
-  state.wizardIntent = options?.intent ?? "onboarding";
-  state.wizardContextLabel = contextParts.filter(Boolean).join(" · ") || null;
+  state.wizardMode = requested.mode;
+  state.wizardIntent = requested.intent;
+  state.wizardProvider = requested.provider;
+  state.wizardOauthOnly = requested.oauthOnly;
+  state.wizardContextLabel = requested.contextLabel;
   state.wizardSessionId = null;
   state.wizardStatus = "running";
   state.wizardError = null;
@@ -220,16 +277,16 @@ export async function startSetupWizard(
   state.wizardDraftValue = null;
   try {
     const result = await state.client.request<WizardStartResult>("wizard.start", {
-      mode,
-      intent: options?.intent ?? "onboarding",
-      ...(providerLabel ? { provider: providerLabel } : {}),
-      ...(options?.oauthOnly !== undefined ? { oauthOnly: options.oauthOnly } : {}),
+      mode: requested.mode,
+      intent: requested.intent,
+      ...(requested.provider ? { provider: requested.provider } : {}),
+      ...(options?.oauthOnly !== undefined ? { oauthOnly: requested.oauthOnly } : {}),
       locale: i18n.getLocale(),
     });
     applyWizardResult(state, result, result.sessionId ?? null);
   } catch (err) {
     if (String(err).includes("wizard already running")) {
-      const recovered = await resumePersistedSetupWizard(state);
+      const recovered = await resumePersistedSetupWizard(state, requested);
       if (recovered) {
         return;
       }

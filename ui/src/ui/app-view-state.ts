@@ -168,6 +168,8 @@ export type AppViewState = {
   wizardBusy: boolean;
   wizardMode: "local" | "remote";
   wizardIntent: "onboarding" | "models-auth-login";
+  wizardProvider: string | null;
+  wizardOauthOnly: boolean;
   wizardContextLabel: string | null;
   wizardSessionId: string | null;
   wizardStatus: "running" | "done" | "cancelled" | "error" | null;

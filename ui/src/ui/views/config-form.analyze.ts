@@ -39,6 +39,16 @@ function normalizeSchemaNode(
   const normalized: JsonSchema = { ...schema };
   const pathLabel = pathKey(path) || "<root>";
 
+  if (path.length > 0 && isAnySchema(schema)) {
+    return {
+      schema: {
+        ...schema,
+        type: "string",
+      },
+      unsupportedPaths: [],
+    };
+  }
+
   if (schema.allOf) {
     const composed = normalizeAllOf(schema, path);
     if (composed) {
@@ -95,8 +105,11 @@ function normalizeSchemaNode(
       if (!isAnySchema(schema.additionalProperties)) {
         const res = normalizeSchemaNode(schema.additionalProperties, [...path, "*"]);
         normalized.additionalProperties = res.schema ?? schema.additionalProperties;
-        if (res.unsupportedPaths.length > 0) {
+        if (!res.schema) {
           unsupported.add(pathLabel);
+        }
+        for (const entry of res.unsupportedPaths) {
+          unsupported.add(entry);
         }
       }
     }
@@ -107,8 +120,11 @@ function normalizeSchemaNode(
     } else {
       const res = normalizeSchemaNode(itemsSchema, [...path, "*"]);
       normalized.items = res.schema ?? itemsSchema;
-      if (res.unsupportedPaths.length > 0) {
+      if (!res.schema) {
         unsupported.add(pathLabel);
+      }
+      for (const entry of res.unsupportedPaths) {
+        unsupported.add(entry);
       }
     }
   } else if (
@@ -357,6 +373,34 @@ function normalizeUnion(
         nullable,
       },
       unsupportedPaths: [],
+    };
+  }
+
+  const normalizedVariants = remaining
+    .map((entry) => {
+      const res = normalizeSchemaNode(entry, path);
+      if (!res.schema) {
+        return null;
+      }
+      return res;
+    })
+    .filter((entry): entry is ConfigSchemaAnalysis => Boolean(entry));
+  if (normalizedVariants.length === remaining.length && normalizedVariants.length > 1) {
+    const unsupportedPaths = new Set<string>();
+    for (const variant of normalizedVariants) {
+      for (const entry of variant.unsupportedPaths) {
+        unsupportedPaths.add(entry);
+      }
+    }
+    return {
+      schema: {
+        ...schema,
+        nullable,
+        anyOf: schema.anyOf ? normalizedVariants.map((variant) => variant.schema!) : undefined,
+        oneOf: schema.oneOf ? normalizedVariants.map((variant) => variant.schema!) : undefined,
+        allOf: undefined,
+      },
+      unsupportedPaths: Array.from(unsupportedPaths),
     };
   }
 

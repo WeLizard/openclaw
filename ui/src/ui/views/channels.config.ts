@@ -50,6 +50,24 @@ function resolveSchemaNode(
   return current;
 }
 
+function hasRenderableSchemaNode(schema: JsonSchema | null): schema is JsonSchema {
+  if (schema === null) {
+    return false;
+  }
+  if (schemaType(schema)) {
+    return true;
+  }
+  return Boolean(
+    schema.properties ||
+      schema.items ||
+      schema.additionalProperties ||
+      schema.enum ||
+      schema.anyOf ||
+      schema.oneOf ||
+      schema.allOf,
+  );
+}
+
 function resolveChannelValue(
   config: Record<string, unknown>,
   channelId: string,
@@ -92,17 +110,18 @@ export function renderChannelConfigForm(props: ChannelConfigFormProps) {
     `;
   }
   const node = resolveSchemaNode(normalized, ["channels", props.channelId]);
-  if (!node) {
+  if (!hasRenderableSchemaNode(node)) {
     return html`
       <div class="callout danger">${t("channels.configSchemaUnavailable")}</div>
     `;
   }
+  const renderableNode = node;
   const configValue = props.configValue ?? {};
   const value = resolveChannelValue(configValue, props.channelId);
   return html`
     <div class="config-form">
       ${renderNode({
-        schema: node,
+        schema: renderableNode,
         value,
         path: ["channels", props.channelId],
         hints: props.uiHints,

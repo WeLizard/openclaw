@@ -279,6 +279,8 @@ export class OpenClawApp extends LitElement {
   @state() wizardBusy = false;
   @state() wizardMode: "local" | "remote" = "local";
   @state() wizardIntent: "onboarding" | "models-auth-login" = "onboarding";
+  @state() wizardProvider: string | null = null;
+  @state() wizardOauthOnly = false;
   @state() wizardContextLabel: string | null = null;
   @state() wizardSessionId: string | null = null;
   @state() wizardStatus: "running" | "done" | "cancelled" | "error" | null = null;

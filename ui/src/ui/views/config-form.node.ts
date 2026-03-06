@@ -29,6 +29,25 @@ function jsonValue(value: unknown): string {
   }
 }
 
+function resolveValueSchemaType(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return "array";
+  }
+  if (value && typeof value === "object") {
+    return "object";
+  }
+  if (typeof value === "string") {
+    return "string";
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? "integer" : "number";
+  }
+  if (typeof value === "boolean") {
+    return "boolean";
+  }
+  return undefined;
+}
+
 // SVG Icons as template literals
 const icons = {
   chevronDown: html`
@@ -364,6 +383,25 @@ export function renderNode(params: {
     const nonNull = variants.filter(
       (v) => !(v.type === "null" || (Array.isArray(v.type) && v.type.includes("null"))),
     );
+
+    const resolvedValue = value ?? schema.default;
+    const valueType = resolveValueSchemaType(resolvedValue);
+    if (valueType) {
+      const matchingVariant = nonNull.find((variant) => {
+        const variantType = schemaType(variant);
+        return variantType === valueType || (variantType === "integer" && valueType === "number");
+      });
+      if (matchingVariant) {
+        return renderNode({ ...params, schema: matchingVariant });
+      }
+    }
+
+    const preferredStructuredVariant =
+      nonNull.find((variant) => schemaType(variant) === "object") ??
+      nonNull.find((variant) => schemaType(variant) === "array");
+    if (preferredStructuredVariant) {
+      return renderNode({ ...params, schema: preferredStructuredVariant });
+    }
 
     if (nonNull.length === 1) {
       return renderNode({ ...params, schema: nonNull[0] });

@@ -486,4 +486,98 @@ describe("config form renderer", () => {
     removeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onPatch).toHaveBeenCalledWith(["accounts"], {});
   });
+
+  it("supports structured unions used by telegram capabilities", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        telegram: {
+          type: "object",
+          properties: {
+            capabilities: {
+              anyOf: [
+                {
+                  type: "array",
+                  items: { type: "string" },
+                },
+                {
+                  type: "object",
+                  properties: {
+                    inlineButtons: {
+                      enum: ["off", "dm", "group", "all", "allowlist"],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    const analysis = analyzeConfigSchema(schema);
+    expect(analysis.unsupportedPaths).not.toContain("telegram.capabilities");
+
+    const onPatch = vi.fn();
+    const container = document.createElement("div");
+    render(
+      renderConfigForm({
+        schema: analysis.schema,
+        uiHints: {},
+        unsupportedPaths: analysis.unsupportedPaths,
+        value: { telegram: { capabilities: { inlineButtons: "dm" } } },
+        onPatch,
+      }),
+      container,
+    );
+
+    expect(container.textContent).toContain("Inline Buttons");
+    expect(container.textContent).not.toContain("Unsupported");
+  });
+
+  it("treats transform-generated any leaves as editable strings", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        telegram: {
+          type: "object",
+          properties: {
+            customCommands: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  command: {},
+                  description: {},
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const analysis = analyzeConfigSchema(schema);
+    expect(analysis.unsupportedPaths).not.toContain("telegram.customCommands");
+    expect(analysis.unsupportedPaths).not.toContain("telegram.customCommands.*.command");
+
+    const onPatch = vi.fn();
+    const container = document.createElement("div");
+    render(
+      renderConfigForm({
+        schema: analysis.schema,
+        uiHints: {},
+        unsupportedPaths: analysis.unsupportedPaths,
+        value: {
+          telegram: {
+            customCommands: [{ command: "backup", description: "Run backup" }],
+          },
+        },
+        onPatch,
+      }),
+      container,
+    );
+
+    const inputs = container.querySelectorAll("input[type='text']");
+    expect(inputs.length).toBeGreaterThanOrEqual(2);
+    expect(container.textContent).not.toContain("Unsupported");
+  });
 });

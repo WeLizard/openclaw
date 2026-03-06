@@ -431,6 +431,7 @@ describe("runOnboardingWizard", () => {
     expect(setupChannels).not.toHaveBeenCalled();
     expect(setupSkills).not.toHaveBeenCalled();
     expect(configureGatewayForOnboarding).not.toHaveBeenCalled();
+    expect(prompter.intro).toHaveBeenCalledWith("Provider auth");
   });
 
   it("resolves gateway.auth.password SecretRef for local onboarding probe", async () => {

@@ -137,7 +137,9 @@ export async function runOnboardingWizard(
 ) {
   const onboardHelpers = await import("../commands/onboard-helpers.js");
   onboardHelpers.printWizardHeader(runtime);
-  await prompter.intro("OpenClaw onboarding");
+  await prompter.intro(
+    opts.intent === "models-auth-login" || opts.provider ? "Provider auth" : "OpenClaw onboarding",
+  );
   if (await runProviderAuthWizard(opts, runtime, prompter)) {
     return;
   }
