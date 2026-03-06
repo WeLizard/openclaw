@@ -120,6 +120,9 @@ export const ru: TranslationMap = {
       subtitle:
         "Показывает, какой профиль провайдера активен сейчас, и позволяет быстро поднять рабочий аккаунт в начало очереди.",
       refreshing: "Обновление...",
+      addProvider: "Добавить провайдера",
+      addProviderHint:
+        "Открывает тот же auth wizard, что и `openclaw models auth login`, включая Custom Provider для OpenAI-compatible и Anthropic-compatible endpoint'ов.",
       empty: "Статус аккаунтов ещё не загружен.",
       noProviders: "Провайдеры моделей с доступным состоянием аккаунтов не найдены.",
       missingProviders:

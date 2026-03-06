@@ -552,10 +552,10 @@ export class OpenClawApp extends LitElement {
     await startSetupWizardInternal(this, mode, { intent: "onboarding" });
   }
 
-  async handleStartProviderAuth(provider: string) {
+  async handleStartProviderAuth(provider?: string) {
     await startSetupWizardInternal(this, "local", {
       intent: "models-auth-login",
-      provider,
+      ...(provider ? { provider } : {}),
       oauthOnly: false,
     });
   }

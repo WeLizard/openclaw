@@ -119,6 +119,9 @@ export const en: TranslationMap = {
       title: "Accounts",
       subtitle: "See which provider profile is active and quickly move a healthy account to the front.",
       refreshing: "Refreshing...",
+      addProvider: "Add provider",
+      addProviderHint:
+        "Launches the same auth wizard as `openclaw models auth login`, including Custom Provider for OpenAI-compatible and Anthropic-compatible endpoints.",
       empty: "Account status has not been loaded yet.",
       noProviders: "No model providers with account state were found.",
       missingProviders:

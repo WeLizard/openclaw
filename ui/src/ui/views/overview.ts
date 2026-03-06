@@ -44,7 +44,7 @@ export type OverviewProps = {
   onDisableProfile: (profileId: string) => void;
   onEnableProfile: (profileId: string) => void;
   onDeleteProfile: (profileId: string) => void;
-  onStartProviderAuth: (provider: string) => void;
+  onStartProviderAuth: (provider?: string) => void;
   onStartWizard: (mode: "local" | "remote") => void;
 };
 
@@ -630,6 +630,13 @@ export function renderOverview(props: OverviewProps) {
           <div class="card-sub">${t("overview.accounts.subtitle")}</div>
         </div>
         <div class="row" style="gap: 10px; align-items: center;">
+          <button
+            class="btn btn--sm primary"
+            ?disabled=${!props.connected || props.wizardLoading || props.wizardBusy || props.wizardOpen}
+            @click=${() => props.onStartProviderAuth()}
+          >
+            ${t("overview.accounts.addProvider")}
+          </button>
           ${props.modelAuthStatus
             ? html`<span class="muted mono">${props.modelAuthStatus.authStorePath}</span>`
             : nothing}
@@ -650,6 +657,10 @@ export function renderOverview(props: OverviewProps) {
             })}
           </div>`
         : nothing}
+
+      <div class="muted" style="margin-top: 12px;">
+        ${t("overview.accounts.addProviderHint")}
+      </div>
 
       ${!props.modelAuthStatus
         ? html`<div class="callout info" style="margin-top: 14px;">${t("overview.accounts.empty")}</div>`

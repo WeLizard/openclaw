@@ -150,4 +150,40 @@ describe("setup wizard controller", () => {
     expect(state.wizardProvider).toBe("qwen-portal");
     expect(state.wizardOauthOnly).toBe(true);
   });
+
+  it("starts provider auth without forcing a provider id", async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === "wizard.start") {
+        return {
+          sessionId: "provider-auth-session",
+          done: false,
+          status: "running",
+          step: {
+            id: "provider-group",
+            type: "select",
+            title: "Provider auth",
+            message: "Choose a provider",
+            options: [],
+          },
+        };
+      }
+      throw new Error(`unexpected ${method}`);
+    });
+    const state = createState(request);
+
+    await startSetupWizard(state, "local", { intent: "models-auth-login" });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(
+      "wizard.start",
+      expect.objectContaining({
+        mode: "local",
+        intent: "models-auth-login",
+      }),
+    );
+    const startParams = request.mock.calls[0]?.[1] as Record<string, unknown> | undefined;
+    expect(startParams?.provider).toBeUndefined();
+    expect(state.wizardIntent).toBe("models-auth-login");
+    expect(state.wizardProvider).toBeNull();
+  });
 });
