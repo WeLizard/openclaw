@@ -1,5 +1,5 @@
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
-import { DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { DEFAULT_CONTEXT_TOKENS, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { buildModelAliasIndex, modelKey } from "../agents/model-selection.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelProviderConfig } from "../config/types.models.js";
@@ -19,13 +19,33 @@ import { setCustomProviderApiKey } from "./onboard-auth.credentials.js";
 import type { SecretInputMode } from "./onboard-types.js";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
-const DEFAULT_CONTEXT_WINDOW = CONTEXT_WINDOW_HARD_MIN_TOKENS;
-const DEFAULT_MAX_TOKENS = 4096;
+const LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW = CONTEXT_WINDOW_HARD_MIN_TOKENS;
+const DEFAULT_CONTEXT_WINDOW = DEFAULT_CONTEXT_TOKENS;
+const LEGACY_CUSTOM_PROVIDER_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 8192;
 const VERIFY_TIMEOUT_MS = 30_000;
 
 function normalizeContextWindowForCustomModel(value: unknown): number {
   const parsed = typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : 0;
+  if (parsed <= 0) {
+    return DEFAULT_CONTEXT_WINDOW;
+  }
+  if (parsed === LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW) {
+    return DEFAULT_CONTEXT_WINDOW;
+  }
   return parsed >= CONTEXT_WINDOW_HARD_MIN_TOKENS ? parsed : CONTEXT_WINDOW_HARD_MIN_TOKENS;
+}
+
+function normalizeMaxTokensForCustomModel(value: unknown, contextWindow: number): number {
+  const parsed = typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : 0;
+  const fallback = Math.min(DEFAULT_MAX_TOKENS, contextWindow);
+  if (parsed <= 0) {
+    return fallback;
+  }
+  if (parsed === LEGACY_CUSTOM_PROVIDER_MAX_TOKENS && contextWindow > LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW) {
+    return fallback;
+  }
+  return Math.min(parsed, contextWindow);
 }
 
 /**
@@ -703,14 +723,17 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
     reasoning: false,
   };
   const mergedModels = hasModel
-    ? existingModels.map((model) =>
-        model.id === modelId
-          ? {
-              ...model,
-              contextWindow: normalizeContextWindowForCustomModel(model.contextWindow),
-            }
-          : model,
-      )
+    ? existingModels.map((model) => {
+        if (model.id !== modelId) {
+          return model;
+        }
+        const contextWindow = normalizeContextWindowForCustomModel(model.contextWindow);
+        return {
+          ...model,
+          contextWindow,
+          maxTokens: normalizeMaxTokensForCustomModel(model.maxTokens, contextWindow),
+        };
+      })
     : [...existingModels, nextModel];
   const { apiKey: existingApiKey, ...existingProviderRest } = existingProvider ?? {};
   const normalizedApiKey =

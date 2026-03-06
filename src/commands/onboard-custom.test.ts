@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { defaultRuntime } from "../runtime.js";
 import {
@@ -439,14 +440,19 @@ describe("promptCustomApiConfig", () => {
 describe("applyCustomApiConfig", () => {
   it.each([
     {
-      name: "uses hard-min context window for newly added custom models",
+      name: "uses catalog-style default context window for newly added custom models",
       existingContextWindow: undefined,
-      expectedContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+      expectedContextWindow: DEFAULT_CONTEXT_TOKENS,
     },
     {
       name: "upgrades existing custom model context window when below hard minimum",
       existingContextWindow: 4096,
       expectedContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+    },
+    {
+      name: "upgrades legacy custom model context window when it still uses the old 16k default",
+      existingContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+      expectedContextWindow: DEFAULT_CONTEXT_TOKENS,
     },
     {
       name: "preserves existing custom model context window when already above minimum",
@@ -459,6 +465,42 @@ describe("applyCustomApiConfig", () => {
       (entry) => entry.id === "foo-large",
     );
     expect(model?.contextWindow).toBe(expectedContextWindow);
+  });
+
+  it("upgrades legacy custom model maxTokens when the old 4k default is paired with an upgraded context window", () => {
+    const result = applyCustomApiConfig({
+      config: {
+        models: {
+          providers: {
+            custom: {
+              api: "openai-completions",
+              baseUrl: "https://llm.example.com/v1",
+              models: [
+                {
+                  id: "foo-large",
+                  name: "foo-large",
+                  contextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+                  maxTokens: 4096,
+                  input: ["text"],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  reasoning: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+      baseUrl: "https://llm.example.com/v1",
+      modelId: "foo-large",
+      compatibility: "openai",
+      providerId: "custom",
+    });
+
+    const model = result.config.models?.providers?.custom?.models?.find(
+      (entry) => entry.id === "foo-large",
+    );
+    expect(model?.contextWindow).toBe(DEFAULT_CONTEXT_TOKENS);
+    expect(model?.maxTokens).toBe(8192);
   });
 
   it.each([
