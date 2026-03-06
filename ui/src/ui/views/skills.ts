@@ -8,6 +8,7 @@ import {
   computeSkillMissing,
   computeSkillReasons,
   renderSkillStatusChips,
+  translateSkillReason,
 } from "./skills-shared.ts";
 
 export type SkillsProps = {
@@ -123,7 +124,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
           reasons.length > 0
             ? html`
               <div class="muted" style="margin-top: 6px;">
-                ${t("skills.reason")}: ${reasons.join(", ")}
+                ${t("skills.reason")}: ${reasons.map(translateSkillReason).join(", ")}
               </div>
             `
             : nothing
