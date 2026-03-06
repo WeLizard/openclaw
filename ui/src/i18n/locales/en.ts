@@ -463,6 +463,194 @@ export const en: TranslationMap = {
       webhookPath: { label: "Webhook Path" },
       webhookPort: { label: "Webhook Port" },
       webhookSecret: { label: "Webhook Secret" },
+      auth: {
+        label: "Authentication",
+        help: "Authentication profile root used for multi-profile provider credentials and cooldown-based failover ordering. Keep profiles minimal and explicit so automatic failover behavior stays auditable.",
+        profiles: {
+          label: "Auth Profiles",
+          help: "Named auth profiles (provider + mode + optional email).",
+        },
+        order: {
+          label: "Auth Profile Order",
+          help: "Ordered auth profile IDs per provider (used for automatic failover).",
+        },
+        cooldowns: {
+          label: "Auth Cooldowns",
+          help: "Cooldown/backoff controls for temporary profile suppression after billing-related failures and retry windows. Use these to prevent rapid re-selection of profiles that are still blocked.",
+          billingBackoffHours: {
+            label: "Billing Backoff (hours)",
+            help: "Base backoff (hours) when a profile fails due to billing/insufficient credits (default: 5).",
+          },
+          billingBackoffHoursByProvider: {
+            label: "Billing Backoff Overrides",
+            help: "Optional per-provider overrides for billing backoff (hours).",
+          },
+          billingMaxHours: {
+            label: "Billing Backoff Cap (hours)",
+            help: "Cap (hours) for billing backoff (default: 24).",
+          },
+          failureWindowHours: {
+            label: "Failover Window (hours)",
+            help: "Failure window (hours) for backoff counters (default: 24).",
+          },
+        },
+      },
+      logging: {
+        label: "Logging",
+        help: "Logging behavior controls for severity, output destinations, formatting, and sensitive-data redaction. Keep levels and redaction strict enough for production while preserving useful diagnostics.",
+        level: {
+          label: "Log Level",
+          help: 'Primary log level threshold for runtime logger output: "silent", "fatal", "error", "warn", "info", "debug", or "trace". Keep "info" or "warn" for production, and use debug/trace only during investigation.',
+        },
+        file: {
+          label: "Log File Path",
+          help: "Optional file path for persisted log output in addition to or instead of console logging. Use a managed writable path and align retention/rotation with your operational policy.",
+        },
+        consoleLevel: {
+          label: "Console Log Level",
+          help: 'Console-specific log threshold: "silent", "fatal", "error", "warn", "info", "debug", or "trace" for terminal output control. Use this to keep local console quieter while retaining richer file logging if needed.',
+        },
+        consoleStyle: {
+          label: "Console Log Style",
+          help: 'Console output format style: "pretty", "compact", or "json" based on operator and ingestion needs. Use json for machine parsing pipelines and pretty/compact for human-first terminal workflows.',
+        },
+        redactSensitive: {
+          label: "Sensitive Data Redaction Mode",
+          help: 'Sensitive redaction mode: "off" disables built-in masking, while "tools" redacts sensitive tool/config payload fields. Keep "tools" in shared logs unless you have isolated secure log sinks.',
+        },
+        redactPatterns: {
+          label: "Custom Redaction Patterns",
+          help: "Additional custom redact regex patterns applied to log output before emission/storage. Use this to mask org-specific tokens and identifiers not covered by built-in redaction rules.",
+        },
+      },
+      update: {
+        label: "Updates",
+        help: "Update-channel and startup-check behavior for keeping OpenClaw runtime versions current. Use conservative channels in production and more experimental channels only in controlled environments.",
+        auto: {
+          label: "Auto",
+          help: "Background auto-update policy for stable/beta rollout windows and scheduling.",
+          enabled: {
+            label: "Auto Update Enabled",
+            help: "Enable background auto-update for package installs (default: false).",
+          },
+          stableDelayHours: {
+            label: "Auto Update Stable Delay (hours)",
+            help: "Minimum delay before stable-channel auto-apply starts (default: 6).",
+          },
+          stableJitterHours: {
+            label: "Auto Update Stable Jitter (hours)",
+            help: "Extra stable-channel rollout spread window in hours (default: 12).",
+          },
+          betaCheckIntervalHours: {
+            label: "Auto Update Beta Check Interval (hours)",
+            help: "How often beta-channel checks run in hours (default: 1).",
+          },
+        },
+        channel: {
+          label: "Update Channel",
+          help: 'Update channel for git + npm installs ("stable", "beta", or "dev").',
+        },
+        checkOnStart: {
+          label: "Update Check on Start",
+          help: "Check for npm updates when the gateway starts (default: true).",
+        },
+      },
+      cli: {
+        label: "CLI",
+        help: "CLI presentation controls for local command output behavior such as banner and tagline style. Use this section to keep startup output aligned with operator preference without changing runtime behavior.",
+        banner: {
+          label: "CLI Banner",
+          help: "CLI startup banner controls for title/version line and tagline style behavior. Keep banner enabled for fast version/context checks, then tune tagline mode to your preferred noise level.",
+          taglineMode: {
+            label: "CLI Banner Tagline Mode",
+            help: 'Controls tagline style in the CLI startup banner: "random" (default) picks from the rotating tagline pool, "default" always shows the neutral default tagline, and "off" hides tagline text while keeping the banner version line.',
+          },
+        },
+      },
+      diagnostics: {
+        label: "Diagnostics",
+        help: "Diagnostics controls for targeted tracing, telemetry export, and cache inspection during debugging. Keep baseline diagnostics minimal in production and enable deeper signals only when investigating issues.",
+        enabled: {
+          label: "Diagnostics Enabled",
+          help: "Master toggle for diagnostics instrumentation output in logs and telemetry wiring paths. Keep enabled for normal observability, and disable only in tightly constrained environments.",
+        },
+        flags: {
+          label: "Diagnostics Flags",
+          help: 'Enable targeted diagnostics logs by flag (e.g. ["telegram.http"]). Supports wildcards like "telegram.*" or "*".',
+        },
+        stuckSessionWarnMs: {
+          label: "Stuck Session Warning Threshold (ms)",
+          help: "Threshold in milliseconds before the runtime emits a warning for sessions that appear stalled.",
+        },
+        otel: {
+          label: "OpenTelemetry",
+          help: "OpenTelemetry export settings for traces, metrics, and logs emitted by gateway components. Use this when integrating with centralized observability backends and distributed tracing pipelines.",
+          enabled: {
+            label: "OpenTelemetry Enabled",
+            help: "Enables OpenTelemetry export pipeline for traces, metrics, and logs based on configured endpoint/protocol settings. Keep disabled unless your collector endpoint and auth are fully configured.",
+          },
+          endpoint: {
+            label: "OpenTelemetry Endpoint",
+            help: "Collector endpoint URL used for OpenTelemetry export transport, including scheme and port. Use a reachable, trusted collector endpoint and monitor ingestion errors after rollout.",
+          },
+          protocol: {
+            label: "OpenTelemetry Protocol",
+            help: "Transport protocol used for exporter requests to the collector. Match this to your collector configuration before enabling export.",
+          },
+          headers: {
+            label: "OpenTelemetry Headers",
+            help: "Additional HTTP/gRPC metadata headers sent with OpenTelemetry export requests, often used for tenant auth or routing. Keep secrets in env-backed values and avoid unnecessary header sprawl.",
+          },
+          serviceName: {
+            label: "OpenTelemetry Service Name",
+            help: "Logical service.name value attached to exported telemetry so traces, metrics, and logs group correctly in your observability backend.",
+          },
+          traces: {
+            label: "OpenTelemetry Traces Enabled",
+            help: "Enable trace signal export to the configured OpenTelemetry collector endpoint. Keep enabled when latency/debug tracing is needed, and disable if you only want metrics/logs.",
+          },
+          metrics: {
+            label: "OpenTelemetry Metrics Enabled",
+            help: "Enable metrics signal export to the configured OpenTelemetry collector endpoint. Keep enabled for runtime health dashboards, and disable only if metric volume must be minimized.",
+          },
+          logs: {
+            label: "OpenTelemetry Logs Enabled",
+            help: "Enable log signal export through OpenTelemetry in addition to local logging sinks. Use this when centralized log correlation is required across services and agents.",
+          },
+          sampleRate: {
+            label: "OpenTelemetry Trace Sample Rate",
+            help: "Trace sampling ratio from 0 to 1 for exported traces. Lower values reduce telemetry cost, while higher values improve debugging fidelity.",
+          },
+          flushIntervalMs: {
+            label: "OpenTelemetry Flush Interval (ms)",
+            help: "Flush interval in milliseconds for exporter batches. Shorter intervals reduce telemetry lag but increase overhead.",
+          },
+        },
+        cacheTrace: {
+          label: "Cache Trace",
+          help: "Cache-trace logging settings for observing cache decisions and payload context in embedded runs. Enable this temporarily for debugging and disable afterward to reduce sensitive log footprint.",
+          enabled: {
+            label: "Cache Trace Enabled",
+            help: "Log cache trace snapshots for embedded agent runs (default: false).",
+          },
+          filePath: {
+            label: "Cache Trace File Path",
+            help: "JSONL output path for cache trace logs (default: $OPENCLAW_STATE_DIR/logs/cache-trace.jsonl).",
+          },
+          includeMessages: {
+            label: "Cache Trace Include Messages",
+            help: "Include full message payloads in trace output (default: true).",
+          },
+          includePrompt: {
+            label: "Cache Trace Include Prompt",
+            help: "Include prompt text in trace output (default: true).",
+          },
+          includeSystem: {
+            label: "Cache Trace Include System",
+            help: "Include system prompt in trace output (default: true).",
+          },
+        },
+      },
     },
     form: {
       unsupportedSchemaUseRaw: "Unsupported schema. Use Raw.",

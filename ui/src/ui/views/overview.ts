@@ -246,9 +246,19 @@ function renderProfileRow(
   `;
 }
 
+export function resolveDisplayedProviderStatus(
+  entry: ModelsAuthProviderStatus,
+): ModelsAuthProviderStatus["status"] {
+  if (entry.effective.kind === "profiles" && entry.status === "static" && entry.profiles.length > 0) {
+    return "ok";
+  }
+  return entry.status;
+}
+
 function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: OverviewProps) {
   const activeProfile =
     entry.profiles.find((profile) => profile.profileId === entry.activeProfileId) ?? null;
+  const displayStatus = resolveDisplayedProviderStatus(entry);
   return html`
     <section class="overview-auth-provider ${entry.inUse ? "overview-auth-provider--in-use" : ""}">
       <div class="overview-auth-provider__header">
@@ -256,7 +266,7 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
           <div class="overview-auth-provider__title">
             <span class="mono">${entry.provider}</span>
             ${entry.inUse ? html`<span class="chip chip-ok">${t("overview.accounts.inUse")}</span>` : nothing}
-            <span class=${resolveAuthStatusChipClass(entry.status)}>${t(`overview.accounts.status.${entry.status}`)}</span>
+            <span class=${resolveAuthStatusChipClass(displayStatus)}>${t(`overview.accounts.status.${displayStatus}`)}</span>
           </div>
           <div class="overview-auth-provider__meta">
             ${t("overview.accounts.source")}: ${formatEffectiveSource(entry)}
