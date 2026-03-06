@@ -1,8 +1,50 @@
 import { formatDurationHuman } from "../../../src/infra/format-time/format-duration.ts";
-import { formatRelativeTimestamp } from "../../../src/infra/format-time/format-relative.ts";
+import { formatRelativeTimestamp as formatRelativeTimestampRaw } from "../../../src/infra/format-time/format-relative.ts";
 import { stripAssistantInternalScaffolding } from "../../../src/shared/text/assistant-visible-text.js";
+import { i18n } from "../i18n/index.ts";
 
-export { formatRelativeTimestamp, formatDurationHuman };
+export { formatDurationHuman };
+
+export function formatRelativeTimestamp(
+  timestampMs: number | null | undefined,
+  options?: Parameters<typeof formatRelativeTimestampRaw>[1],
+): string {
+  const value = formatRelativeTimestampRaw(timestampMs, options);
+  if (i18n.getLocale() !== "ru") {
+    return value;
+  }
+  if (value === "just now") {
+    return "только что";
+  }
+  if (value === "in <1m") {
+    return "меньше чем через минуту";
+  }
+  const minutesFuture = value.match(/^in (\d+)m$/);
+  if (minutesFuture) {
+    return `через ${minutesFuture[1]} мин`;
+  }
+  const hoursFuture = value.match(/^in (\d+)h$/);
+  if (hoursFuture) {
+    return `через ${hoursFuture[1]} ч`;
+  }
+  const daysFuture = value.match(/^in (\d+)d$/);
+  if (daysFuture) {
+    return `через ${daysFuture[1]} д`;
+  }
+  const minutesPast = value.match(/^(\d+)m ago$/);
+  if (minutesPast) {
+    return `${minutesPast[1]} мин назад`;
+  }
+  const hoursPast = value.match(/^(\d+)h ago$/);
+  if (hoursPast) {
+    return `${hoursPast[1]} ч назад`;
+  }
+  const daysPast = value.match(/^(\d+)d ago$/);
+  if (daysPast) {
+    return `${daysPast[1]} д назад`;
+  }
+  return value;
+}
 
 export function formatMs(ms?: number | null): string {
   if (!ms && ms !== 0) {

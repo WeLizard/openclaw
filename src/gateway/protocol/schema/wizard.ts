@@ -11,6 +11,21 @@ const WizardRunStatusSchema = Type.Union([
 export const WizardStartParamsSchema = Type.Object(
   {
     mode: Type.Optional(Type.Union([Type.Literal("local"), Type.Literal("remote")])),
+    flow: Type.Optional(
+      Type.Union([
+        Type.Literal("quickstart"),
+        Type.Literal("advanced"),
+        Type.Literal("manual"),
+        Type.Literal("onboarding"),
+        Type.Literal("models-auth-login"),
+      ]),
+    ),
+    intent: Type.Optional(
+      Type.Union([Type.Literal("onboarding"), Type.Literal("models-auth-login")]),
+    ),
+    provider: Type.Optional(Type.String()),
+    oauthOnly: Type.Optional(Type.Boolean()),
+    locale: Type.Optional(Type.String()),
     workspace: Type.Optional(Type.String()),
   },
   { additionalProperties: false },

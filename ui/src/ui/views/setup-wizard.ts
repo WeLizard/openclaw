@@ -163,16 +163,22 @@ export function renderSetupWizard(state: AppViewState) {
     state.wizardStatus === "error";
   const statusLabel =
     state.wizardStatus != null ? t(`wizard.status.${state.wizardStatus}`) : t("wizard.status.running");
+  const title =
+    state.wizardIntent === "models-auth-login" ? t("wizard.titleModelAuth") : t("wizard.title");
+  const subtitle =
+    state.wizardIntent === "models-auth-login" && state.wizardContextLabel
+      ? t("wizard.modeModelAuth", { provider: state.wizardContextLabel })
+      : state.wizardMode === "remote"
+        ? t("wizard.modeRemote")
+        : t("wizard.modeLocal");
 
   return html`
     <div class="exec-approval-overlay" role="dialog" aria-modal="true" aria-live="polite">
       <div class="exec-approval-card wizard-card">
         <div class="exec-approval-header">
           <div>
-            <div class="exec-approval-title">${t("wizard.title")}</div>
-            <div class="exec-approval-sub">
-              ${state.wizardMode === "remote" ? t("wizard.modeRemote") : t("wizard.modeLocal")}
-            </div>
+            <div class="exec-approval-title">${title}</div>
+            <div class="exec-approval-sub">${subtitle}</div>
           </div>
           <span
             class="chip ${state.wizardStatus === "error"

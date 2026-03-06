@@ -1,6 +1,9 @@
 import type { TranslationMap } from "../lib/types.ts";
 
 export const en: TranslationMap = {
+  app: {
+    dashboard: "Gateway Dashboard",
+  },
   common: {
     version: "Version",
     health: "Health",
@@ -189,6 +192,7 @@ export const en: TranslationMap = {
   sessions: {
     title: "Sessions",
     subtitle: "Active session keys and per-session overrides.",
+    mainSession: "Main Session",
     model: "Model",
     modelPlaceholder: "provider/model",
     activeModel: "Active: {model}",
@@ -359,6 +363,32 @@ export const en: TranslationMap = {
       canvasHost: { label: "Canvas Host", description: "Canvas rendering and display." },
       talk: { label: "Talk", description: "Voice and speech settings." },
       plugins: { label: "Plugins", description: "Plugin management and extensions." },
+    },
+    fields: {
+      wizard: {
+        label: "Setup Wizard",
+        help: "Setup wizard state tracking fields for the most recent guided onboarding run.",
+        lastRunAt: {
+          label: "Wizard Last Run Timestamp",
+          help: "ISO timestamp for when the setup wizard most recently completed on this host. Use this to confirm onboarding recency during support and operational audits.",
+        },
+        lastRunVersion: {
+          label: "Wizard Last Run Version",
+          help: "OpenClaw version recorded for the most recent wizard run on this config. Use this when diagnosing onboarding changes across versions.",
+        },
+        lastRunCommit: {
+          label: "Wizard Last Run Commit",
+          help: "Source commit identifier recorded for the last wizard execution in development builds. Use this to correlate onboarding behavior with exact source state during debugging.",
+        },
+        lastRunCommand: {
+          label: "Wizard Last Run Command",
+          help: "Command invocation recorded for the latest wizard run to preserve execution context. Use this to reproduce onboarding steps when verifying setup regressions.",
+        },
+        lastRunMode: {
+          label: "Wizard Last Run Mode",
+          help: 'Wizard execution mode recorded as "local" or "remote" for the most recent onboarding flow.',
+        },
+      },
     },
     form: {
       unsupportedSchemaUseRaw: "Unsupported schema. Use Raw.",
@@ -915,6 +945,7 @@ export const en: TranslationMap = {
     messagesTotalHint: "Total user + assistant messages in range.",
     toolCallsTotalHint: "Total tool call count across sessions.",
     errorsTotalHint: "Total message/tool errors in range.",
+    errorsCount: "{count} errors",
     distinctSessionsHint: "Distinct sessions in the range.",
   },
   wizard: {

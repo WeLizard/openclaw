@@ -464,6 +464,8 @@ export function resolveSessionDisplayName(
   const label = row?.label?.trim() || "";
   const displayName = row?.displayName?.trim() || "";
   const { prefix, fallbackName } = parseSessionKey(key);
+  const localizedFallbackName =
+    fallbackName === "Main Session" ? t("sessions.mainSession") : fallbackName;
 
   const applyTypedPrefix = (name: string): string => {
     if (!prefix) {
@@ -479,7 +481,7 @@ export function resolveSessionDisplayName(
   if (displayName && displayName !== key) {
     return applyTypedPrefix(displayName);
   }
-  return fallbackName;
+  return localizedFallbackName;
 }
 
 export function isCronSessionKey(key: string): boolean {

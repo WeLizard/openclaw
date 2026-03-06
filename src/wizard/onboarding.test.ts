@@ -394,6 +394,45 @@ describe("runOnboardingWizard", () => {
     }
   });
 
+  it("runs provider auth flow without entering full onboarding", async () => {
+    promptAuthChoiceGrouped.mockClear();
+    applyAuthChoice.mockClear();
+    setupChannels.mockClear();
+    setupSkills.mockClear();
+    configureGatewayForOnboarding.mockClear();
+
+    promptAuthChoiceGrouped.mockResolvedValueOnce("qwen-portal");
+    const prompter = buildWizardPrompter({});
+    const runtime = createRuntime();
+
+    await runOnboardingWizard(
+      {
+        intent: "models-auth-login",
+        provider: "qwen-portal",
+        oauthOnly: true,
+      },
+      runtime,
+      prompter,
+    );
+
+    expect(promptAuthChoiceGrouped).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeSkip: false,
+        provider: "qwen-portal",
+        oauthOnly: true,
+      }),
+    );
+    expect(applyAuthChoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authChoice: "qwen-portal",
+        setDefaultModel: false,
+      }),
+    );
+    expect(setupChannels).not.toHaveBeenCalled();
+    expect(setupSkills).not.toHaveBeenCalled();
+    expect(configureGatewayForOnboarding).not.toHaveBeenCalled();
+  });
+
   it("resolves gateway.auth.password SecretRef for local onboarding probe", async () => {
     const previous = process.env.OPENCLAW_GATEWAY_PASSWORD;
     process.env.OPENCLAW_GATEWAY_PASSWORD = "gateway-ref-password";

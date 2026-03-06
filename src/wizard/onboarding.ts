@@ -70,6 +70,66 @@ async function requireRiskAcknowledgement(params: {
   }
 }
 
+async function runProviderAuthWizard(
+  opts: OnboardOptions,
+  runtime: RuntimeEnv,
+  prompter: WizardPrompter,
+): Promise<boolean> {
+  if (opts.intent !== "models-auth-login" && !opts.provider) {
+    return false;
+  }
+
+  const snapshot = await readConfigFileSnapshot();
+  const baseConfig: OpenClawConfig = snapshot.valid ? snapshot.config : {};
+  if (snapshot.exists && !snapshot.valid) {
+    await prompter.note("Config is invalid. Fix it first, then re-run auth setup.", "Provider auth");
+    runtime.exit(1);
+    return true;
+  }
+
+  const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
+  const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
+  const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const { applyAuthChoice } = await import("../commands/auth-choice.js");
+  const { logConfigUpdated } = await import("../config/logging.js");
+
+  const authStore = ensureAuthProfileStore(undefined, {
+    allowKeychainPrompt: false,
+  });
+  const authChoice = await promptAuthChoiceGrouped({
+    prompter,
+    store: authStore,
+    includeSkip: false,
+    provider: opts.provider,
+    oauthOnly: opts.oauthOnly,
+  });
+
+  let nextConfig = baseConfig;
+  if (authChoice === "custom-api-key") {
+    const customResult = await promptCustomApiConfig({
+      prompter,
+      runtime,
+      config: nextConfig,
+      secretInputMode: opts.secretInputMode,
+    });
+    nextConfig = customResult.config;
+  } else {
+    const authResult = await applyAuthChoice({
+      authChoice,
+      config: nextConfig,
+      prompter,
+      runtime,
+      setDefaultModel: false,
+    });
+    nextConfig = authResult.config;
+  }
+
+  await writeConfigFile(nextConfig);
+  logConfigUpdated(runtime);
+  await prompter.outro("Auth setup complete.");
+  return true;
+}
+
 export async function runOnboardingWizard(
   opts: OnboardOptions,
   runtime: RuntimeEnv = defaultRuntime,
@@ -78,6 +138,9 @@ export async function runOnboardingWizard(
   const onboardHelpers = await import("../commands/onboard-helpers.js");
   onboardHelpers.printWizardHeader(runtime);
   await prompter.intro("OpenClaw onboarding");
+  if (await runProviderAuthWizard(opts, runtime, prompter)) {
+    return;
+  }
   await requireRiskAcknowledgement({ opts, prompter });
 
   const snapshot = await readConfigFileSnapshot();

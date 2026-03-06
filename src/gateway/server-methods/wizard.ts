@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { defaultRuntime } from "../../runtime.js";
+import { localizeWizardPrompter } from "../../wizard/localized-prompter.js";
 import { WizardSession } from "../../wizard/session.js";
 import {
   ErrorCodes,
@@ -44,12 +45,29 @@ export const wizardHandlers: GatewayRequestHandlers = {
       return;
     }
     const sessionId = randomUUID();
+    const explicitIntent: "onboarding" | "models-auth-login" =
+      params.intent === "models-auth-login" || params.flow === "models-auth-login"
+        ? "models-auth-login"
+        : "onboarding";
+    const flow =
+      params.flow === "quickstart" || params.flow === "advanced" || params.flow === "manual"
+        ? params.flow
+        : undefined;
     const opts = {
       mode: params.mode,
+      flow,
+      intent: explicitIntent,
+      provider: typeof params.provider === "string" ? params.provider : undefined,
+      oauthOnly: params.oauthOnly === true,
+      locale: typeof params.locale === "string" ? params.locale : undefined,
       workspace: typeof params.workspace === "string" ? params.workspace : undefined,
     };
     const session = new WizardSession((prompter) =>
-      context.wizardRunner(opts, defaultRuntime, prompter),
+      context.wizardRunner(
+        opts,
+        defaultRuntime,
+        localizeWizardPrompter(prompter, opts.locale),
+      ),
     );
     context.wizardSessions.set(sessionId, session);
     const result = await session.next();

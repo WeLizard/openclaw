@@ -17,6 +17,14 @@ export type AuthChoiceGroup = {
   options: AuthChoiceOption[];
 };
 
+const AUTH_CHOICE_GROUP_ALIASES: Partial<Record<AuthChoiceGroupId, string[]>> = {
+  openai: ["openai-codex"],
+  google: ["google-vertex"],
+  qwen: ["qwen-portal"],
+  moonshot: ["kimi", "kimi-code"],
+  copilot: ["github"],
+};
+
 const AUTH_CHOICE_GROUP_DEFS: {
   value: AuthChoiceGroupId;
   label: string;
@@ -332,7 +340,31 @@ export function buildAuthChoiceOptions(params: {
   return options;
 }
 
-export function buildAuthChoiceGroups(params: { store: AuthProfileStore; includeSkip: boolean }): {
+export function resolveAuthChoiceGroupId(rawProvider?: string): AuthChoiceGroupId | undefined {
+  const normalized = String(rawProvider ?? "").trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  for (const group of AUTH_CHOICE_GROUP_DEFS) {
+    if (group.value === normalized) {
+      return group.value;
+    }
+    const aliases = AUTH_CHOICE_GROUP_ALIASES[group.value] ?? [];
+    if (aliases.includes(normalized)) {
+      return group.value;
+    }
+  }
+
+  return undefined;
+}
+
+export function buildAuthChoiceGroups(params: {
+  store: AuthProfileStore;
+  includeSkip: boolean;
+  provider?: string;
+  oauthOnly?: boolean;
+}): {
   groups: AuthChoiceGroup[];
   skipOption?: AuthChoiceOption;
 } {
@@ -344,12 +376,29 @@ export function buildAuthChoiceGroups(params: { store: AuthProfileStore; include
     options.map((opt) => [opt.value, opt]),
   );
 
-  const groups = AUTH_CHOICE_GROUP_DEFS.map((group) => ({
-    ...group,
-    options: group.choices
-      .map((choice) => optionByValue.get(choice))
-      .filter((opt): opt is AuthChoiceOption => Boolean(opt)),
-  }));
+  const providerGroupId = resolveAuthChoiceGroupId(params.provider);
+  const groups = AUTH_CHOICE_GROUP_DEFS
+    .map((group) => ({
+      ...group,
+      options: group.choices
+        .map((choice) => optionByValue.get(choice))
+        .filter((opt): opt is AuthChoiceOption => Boolean(opt))
+        .filter((opt) => {
+          if (!params.oauthOnly) {
+            return true;
+          }
+          const normalized = String(opt.value).toLowerCase();
+          return (
+            normalized.includes("oauth") ||
+            normalized.includes("portal") ||
+            normalized === "chutes" ||
+            normalized === "github-copilot" ||
+            normalized === "google-gemini-cli" ||
+            normalized === "token"
+          );
+        }),
+    }))
+    .filter((group) => !providerGroupId || group.value === providerGroupId);
 
   const skipOption = params.includeSkip
     ? ({ value: "skip", label: "Skip for now" } satisfies AuthChoiceOption)

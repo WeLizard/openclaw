@@ -1,5 +1,6 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
 import type { WizardNextResult, WizardStartResult, WizardStep } from "../types.ts";
+import { i18n } from "../../i18n/index.ts";
 
 export type SetupWizardMode = "local" | "remote";
 export type SetupWizardStatus = WizardStartResult["status"] | null;
@@ -115,7 +116,13 @@ export async function startSetupWizard(
   state.wizardStep = null;
   state.wizardDraftValue = null;
   try {
-    const result = await state.client.request<WizardStartResult>("wizard.start", { mode });
+    const result = await state.client.request<WizardStartResult>("wizard.start", {
+      mode,
+      intent: options?.intent ?? "onboarding",
+      ...(providerLabel ? { provider: providerLabel } : {}),
+      ...(options?.oauthOnly !== undefined ? { oauthOnly: options.oauthOnly } : {}),
+      locale: i18n.getLocale(),
+    });
     applyWizardResult(state, result, result.sessionId ?? null);
   } catch (err) {
     state.wizardLoading = false;

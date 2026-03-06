@@ -157,9 +157,16 @@ function resolveFieldMeta(
   schema: JsonSchema,
   hints: ConfigUiHints,
 ): FieldMeta {
+  const key = pathKey(path);
+  const localizedLabelKey = key ? `config.fields.${key}.label` : "";
+  const localizedHelpKey = key ? `config.fields.${key}.help` : "";
+  const localizedLabel =
+    localizedLabelKey && t(localizedLabelKey) !== localizedLabelKey ? t(localizedLabelKey) : undefined;
+  const localizedHelp =
+    localizedHelpKey && t(localizedHelpKey) !== localizedHelpKey ? t(localizedHelpKey) : undefined;
   const hint = hintForPath(path, hints);
-  const label = hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
-  const help = hint?.help ?? schema.description;
+  const label = localizedLabel ?? hint?.label ?? schema.title ?? humanize(String(path.at(-1)));
+  const help = localizedHelp ?? hint?.help ?? schema.description;
   const schemaTags = normalizeTags(schema["x-tags"] ?? schema.tags);
   const hintTags = normalizeTags(hint?.tags);
   return {

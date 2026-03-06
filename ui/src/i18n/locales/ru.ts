@@ -1,6 +1,9 @@
 import type { TranslationMap } from "../lib/types.ts";
 
 export const ru: TranslationMap = {
+  app: {
+    dashboard: "Панель управления шлюзом",
+  },
   common: {
     version: "Версия",
     health: "Состояние",
@@ -254,6 +257,7 @@ export const ru: TranslationMap = {
   sessions: {
     title: "Сессии",
     subtitle: "Активные ключи сессий и переопределения по сессиям.",
+    mainSession: "Основная сессия",
     model: "Модель",
     modelPlaceholder: "provider/model",
     activeModel: "Активная модель: {model}",
@@ -282,9 +286,9 @@ export const ru: TranslationMap = {
       updated: "Обновлено",
       tokens: "Токены",
       model: "Модель",
-      thinking: "Thinking",
-      verbose: "Verbose",
-      reasoning: "Reasoning",
+      thinking: "Мышление",
+      verbose: "Подробность",
+      reasoning: "Рассуждение",
       actions: "Действия",
     },
   },
@@ -424,6 +428,32 @@ export const ru: TranslationMap = {
       canvasHost: { label: "Canvas Host", description: "Рендеринг Canvas и вывод на дисплей." },
       talk: { label: "Голос", description: "Настройки голоса и речи." },
       plugins: { label: "Плагины", description: "Управление плагинами и расширениями." },
+    },
+    fields: {
+      wizard: {
+        label: "Мастер настройки",
+        help: "Поля состояния мастера настройки, которые сохраняют информацию о последнем guided onboarding запуске.",
+        lastRunAt: {
+          label: "Время последнего запуска мастера",
+          help: "ISO-время, когда мастер настройки в последний раз успешно завершился на этом хосте. Используй это для проверки актуальности onboarding во время поддержки и аудита.",
+        },
+        lastRunVersion: {
+          label: "Версия последнего запуска мастера",
+          help: "Версия OpenClaw, записанная во время последнего запуска мастера для этого конфига. Полезно при разборе различий между версиями.",
+        },
+        lastRunCommit: {
+          label: "Коммит последнего запуска мастера",
+          help: "Идентификатор исходного коммита, зафиксированный для последнего запуска мастера в dev-сборках. Помогает связать поведение onboarding с точным состоянием исходников.",
+        },
+        lastRunCommand: {
+          label: "Команда последнего запуска мастера",
+          help: "Команда, записанная для последнего запуска мастера, чтобы сохранить контекст выполнения. Помогает воспроизвести шаги onboarding при проверке регрессий.",
+        },
+        lastRunMode: {
+          label: "Режим последнего запуска мастера",
+          help: 'Режим выполнения мастера, записанный как "local" или "remote" для последнего onboarding-потока.',
+        },
+      },
     },
     form: {
       unsupportedSchemaUseRaw: "Неподдерживаемая схема. Используйте Raw.",
@@ -847,7 +877,7 @@ export const ru: TranslationMap = {
     totalLabel: "Итого",
     overviewTitle: "Обзор использования",
     messages: "сообщения",
-    userAssistantCounts: "{user} user · {assistant} assistant",
+    userAssistantCounts: "{user} пользователь · {assistant} ассистент",
     toolCalls: "Вызовы инструментов",
     toolsUsed: "{count} инструментов использовано",
     errors: "Ошибки",
@@ -981,6 +1011,7 @@ export const ru: TranslationMap = {
     messagesTotalHint: "Общее число сообщений пользователя и ассистента в диапазоне.",
     toolCallsTotalHint: "Общее число вызовов инструментов по сессиям.",
     errorsTotalHint: "Общее число ошибок сообщений и инструментов в диапазоне.",
+    errorsCount: "{count} ошибок",
     distinctSessionsHint: "Уникальные сессии в диапазоне.",
   },
   languages: {
