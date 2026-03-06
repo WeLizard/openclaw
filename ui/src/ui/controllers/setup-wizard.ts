@@ -29,6 +29,66 @@ export type SetupWizardState = {
   loadOverview?: () => Promise<void>;
 };
 
+type PersistedSetupWizardState = {
+  sessionId: string;
+  mode: SetupWizardMode;
+  intent: SetupWizardIntent;
+  contextLabel: string | null;
+};
+
+const SETUP_WIZARD_STORAGE_KEY = "openclaw.control.setupWizard.v1";
+
+function readPersistedSetupWizardState(): PersistedSetupWizardState | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  const raw = localStorage.getItem(SETUP_WIZARD_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as PersistedSetupWizardState;
+    if (
+      !parsed ||
+      typeof parsed.sessionId !== "string" ||
+      (parsed.mode !== "local" && parsed.mode !== "remote") ||
+      (parsed.intent !== "onboarding" && parsed.intent !== "models-auth-login")
+    ) {
+      localStorage.removeItem(SETUP_WIZARD_STORAGE_KEY);
+      return null;
+    }
+    return {
+      sessionId: parsed.sessionId,
+      mode: parsed.mode,
+      intent: parsed.intent,
+      contextLabel: typeof parsed.contextLabel === "string" ? parsed.contextLabel : null,
+    };
+  } catch {
+    localStorage.removeItem(SETUP_WIZARD_STORAGE_KEY);
+    return null;
+  }
+}
+
+function persistSetupWizardState(state: SetupWizardState) {
+  if (typeof localStorage === "undefined" || !state.wizardSessionId) {
+    return;
+  }
+  const payload: PersistedSetupWizardState = {
+    sessionId: state.wizardSessionId,
+    mode: state.wizardMode,
+    intent: state.wizardIntent,
+    contextLabel: state.wizardContextLabel,
+  };
+  localStorage.setItem(SETUP_WIZARD_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function clearPersistedSetupWizardState() {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  localStorage.removeItem(SETUP_WIZARD_STORAGE_KEY);
+}
+
 function resolveInitialDraft(step: WizardStep | null): unknown {
   if (!step) {
     return null;
@@ -64,6 +124,11 @@ function applyWizardResult(
   state.wizardSessionId = result.done ? null : (sessionId ?? state.wizardSessionId);
   state.wizardStep = result.done ? null : (result.step ?? null);
   state.wizardDraftValue = resolveInitialDraft(state.wizardStep);
+  if (result.done || state.wizardStatus !== "running" || !state.wizardSessionId) {
+    clearPersistedSetupWizardState();
+  } else {
+    persistSetupWizardState(state);
+  }
   if (result.done) {
     void state.loadOverview?.();
   }
@@ -82,6 +147,40 @@ function resetWizardState(state: SetupWizardState) {
   state.wizardDraftValue = null;
 }
 
+async function resumePersistedSetupWizard(state: SetupWizardState): Promise<boolean> {
+  if (!state.client || !state.connected) {
+    return false;
+  }
+  const persisted = readPersistedSetupWizardState();
+  if (!persisted) {
+    return false;
+  }
+  state.wizardOpen = true;
+  state.wizardLoading = true;
+  state.wizardBusy = false;
+  state.wizardMode = persisted.mode;
+  state.wizardIntent = persisted.intent;
+  state.wizardContextLabel = persisted.contextLabel;
+  state.wizardSessionId = persisted.sessionId;
+  state.wizardStatus = "running";
+  state.wizardError = null;
+  state.wizardStep = null;
+  state.wizardDraftValue = null;
+  try {
+    const result = await state.client.request<WizardNextResult>("wizard.next", {
+      sessionId: persisted.sessionId,
+    });
+    applyWizardResult(state, result, persisted.sessionId);
+    return true;
+  } catch (err) {
+    clearPersistedSetupWizardState();
+    resetWizardState(state);
+    state.wizardError = String(err);
+    state.wizardStatus = "error";
+    return false;
+  }
+}
+
 export function updateSetupWizardDraft(state: SetupWizardState, value: unknown) {
   state.wizardDraftValue = value;
 }
@@ -96,6 +195,10 @@ export async function startSetupWizard(
   options?: StartSetupWizardOptions,
 ) {
   if (!state.client || !state.connected || state.wizardLoading || state.wizardBusy) {
+    return;
+  }
+  const restored = await resumePersistedSetupWizard(state);
+  if (restored) {
     return;
   }
   const providerLabel =
@@ -125,6 +228,12 @@ export async function startSetupWizard(
     });
     applyWizardResult(state, result, result.sessionId ?? null);
   } catch (err) {
+    if (String(err).includes("wizard already running")) {
+      const recovered = await resumePersistedSetupWizard(state);
+      if (recovered) {
+        return;
+      }
+    }
     state.wizardLoading = false;
     state.wizardError = String(err);
     state.wizardStatus = "error";
@@ -168,5 +277,6 @@ export async function cancelSetupWizard(state: SetupWizardState) {
       // Ignore cancellation transport errors; local state still needs to clear.
     }
   }
+  clearPersistedSetupWizardState();
   resetWizardState(state);
 }
