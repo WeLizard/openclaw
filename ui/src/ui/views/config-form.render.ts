@@ -345,6 +345,18 @@ export const SECTION_META: Record<
     labelKey: "config.sectionMeta.models.label",
     descriptionKey: "config.sectionMeta.models.description",
   },
+  diagnostics: {
+    label: "Diagnostics",
+    description: "Health checks, probes, and support diagnostics",
+    labelKey: "config.sectionMeta.diagnostics.label",
+    descriptionKey: "config.sectionMeta.diagnostics.description",
+  },
+  cli: {
+    label: "CLI",
+    description: "CLI behavior and command defaults",
+    labelKey: "config.sectionMeta.cli.label",
+    descriptionKey: "config.sectionMeta.cli.description",
+  },
   bindings: {
     label: "Bindings",
     description: "Key bindings and shortcuts",
@@ -362,6 +374,18 @@ export const SECTION_META: Record<
     description: "Audio input/output settings",
     labelKey: "config.sectionMeta.audio.label",
     descriptionKey: "config.sectionMeta.audio.description",
+  },
+  media: {
+    label: "Media",
+    description: "Media handling, storage, and delivery settings",
+    labelKey: "config.sectionMeta.media.label",
+    descriptionKey: "config.sectionMeta.media.description",
+  },
+  approvals: {
+    label: "Approvals",
+    description: "Approval prompts, policies, and safety defaults",
+    labelKey: "config.sectionMeta.approvals.label",
+    descriptionKey: "config.sectionMeta.approvals.description",
   },
   session: {
     label: "Session",
@@ -387,6 +411,24 @@ export const SECTION_META: Record<
     labelKey: "config.sectionMeta.discovery.label",
     descriptionKey: "config.sectionMeta.discovery.description",
   },
+  secrets: {
+    label: "Secrets",
+    description: "Secret storage and secret resolution settings",
+    labelKey: "config.sectionMeta.secrets.label",
+    descriptionKey: "config.sectionMeta.secrets.description",
+  },
+  acp: {
+    label: "ACP",
+    description: "Agent control plane settings and approvals",
+    labelKey: "config.sectionMeta.acp.label",
+    descriptionKey: "config.sectionMeta.acp.description",
+  },
+  nodeHost: {
+    label: "Node Host",
+    description: "Node hosting, pairing, and remote execution settings",
+    labelKey: "config.sectionMeta.nodeHost.label",
+    descriptionKey: "config.sectionMeta.nodeHost.description",
+  },
   canvasHost: {
     label: "Canvas Host",
     description: "Canvas rendering and display",
@@ -398,6 +440,12 @@ export const SECTION_META: Record<
     description: "Voice and speech settings",
     labelKey: "config.sectionMeta.talk.label",
     descriptionKey: "config.sectionMeta.talk.description",
+  },
+  memory: {
+    label: "Memory",
+    description: "Memory indexing, retrieval, and storage settings",
+    labelKey: "config.sectionMeta.memory.label",
+    descriptionKey: "config.sectionMeta.memory.description",
   },
   plugins: {
     label: "Plugins",
@@ -582,8 +630,8 @@ export function renderConfigForm(props: ConfigFormProps) {
             `;
             })()
           : filteredEntries.map(([key, node]) => {
-              const meta = SECTION_META[key] ?? {
-                label: key.charAt(0).toUpperCase() + key.slice(1),
+              const meta = resolveSectionMetaText(key) ?? {
+                label: humanize(key),
                 description: node.description ?? "",
               };
 

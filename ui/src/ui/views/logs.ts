@@ -53,6 +53,8 @@ export function renderLogs(props: LogsProps) {
     return matchesFilter(entry, needle);
   });
   const exportLabel = needle || levelFiltered ? "filtered" : "visible";
+  const exportButtonLabel =
+    exportLabel === "filtered" ? t("logs.exportFiltered") : t("logs.exportVisible");
 
   return html`
     <section class="card">
@@ -74,7 +76,7 @@ export function renderLogs(props: LogsProps) {
                 exportLabel,
               )}
           >
-            ${t("logs.export", { label: exportLabel })}
+            ${exportButtonLabel}
           </button>
         </div>
       </div>

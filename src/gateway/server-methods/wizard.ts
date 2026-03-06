@@ -41,8 +41,15 @@ export const wizardHandlers: GatewayRequestHandlers = {
     }
     const running = context.findRunningWizard();
     if (running) {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "wizard already running"));
-      return;
+      const runningSession = context.wizardSessions.get(running);
+      if (runningSession) {
+        const result = await runningSession.next();
+        if (result.done) {
+          context.purgeWizardSession(running);
+        }
+        respond(true, { sessionId: running, ...result }, undefined);
+        return;
+      }
     }
     const sessionId = randomUUID();
     const explicitIntent: "onboarding" | "models-auth-login" =

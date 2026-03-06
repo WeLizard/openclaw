@@ -390,7 +390,7 @@ function renderAgentBinding(agent: BindingAgent, state: BindingState) {
             }}
           >
             <option value="__default__" ?selected=${bindingValue === "__default__"}>
-              Use default
+              ${t("nodes.bindings.useDefault")}
             </option>
             ${state.nodes.map(
               (node) =>
