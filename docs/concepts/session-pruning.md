@@ -62,6 +62,9 @@ If `agents.defaults.contextTokens` is set, it is treated as a cap (min) on the r
 
 - Pruning only runs if the last eligible cache touch is older than `ttl` (default `5m`).
 - When it runs: same soft-trim + hard-clear behavior as before.
+- `cache-ttl` only works on cache-aware routes. Generic OpenAI-compatible /
+  custom providers are not eligible today, so for those tool-heavy sessions you
+  should use `mode: "always"` instead of assuming TTL pruning will fire.
 
 ## Soft vs hard pruning
 
@@ -107,6 +110,14 @@ Enable TTL-aware pruning:
 ```json5
 {
   agents: { defaults: { contextPruning: { mode: "cache-ttl", ttl: "5m" } } },
+}
+```
+
+Enable pruning for non-cache-aware custom / OpenAI-compatible routes:
+
+```json5
+{
+  agents: { defaults: { contextPruning: { mode: "always" } } },
 }
 ```
 

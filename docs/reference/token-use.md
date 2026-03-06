@@ -172,4 +172,59 @@ rejects that combination with HTTP 401.
 - Keep skill descriptions short (skill list is injected into the prompt).
 - Prefer smaller models for verbose, exploratory work.
 
+## Balanced profile for long-lived tool-heavy agents
+
+For coding / automation agents, a small context window often looks "cheap" at
+first but creates repeated compaction, re-explanation, and tool-result churn.
+A better baseline is to keep the injected bootstrap lean and raise the session
+budget only enough to avoid constant compression.
+
+Recommended baseline:
+
+```yaml
+agents:
+  defaults:
+    contextTokens: 64000
+    bootstrapMaxChars: 5000
+    bootstrapTotalMaxChars: 20000
+    compaction:
+      mode: safeguard
+      reserveTokensFloor: 20000
+    contextPruning:
+      mode: always
+```
+
+Use this profile when the agent is long-lived, tool-heavy, and routed through a
+generic OpenAI-compatible or custom provider. In that case, pruning old
+`toolResult` messages is more effective than aggressively shrinking the overall
+window.
+
+For cache-aware providers (for example Anthropic / Moonshot / ZAI and eligible
+OpenRouter routes), prefer TTL-aware pruning instead:
+
+```yaml
+agents:
+  defaults:
+    contextPruning:
+      mode: cache-ttl
+      ttl: 1h
+```
+
+### Operational loop
+
+Use `/context detail` as the first diagnostic step. Check:
+
+- `Injected workspace files`
+- `System prompt` and `Project Context`
+- `Top tools (schema size)`
+- `Session tokens ... / ctx=...`
+
+If the agent still compacts too often:
+
+- shorten `AGENTS.md`, `BOOTSTRAP.md`, and `USER.md`
+- keep long handoffs / notes / logs on-demand via `read`
+- trim or compact old tool output before raising limits again
+
+Do not solve bootstrap bloat by only increasing limits. Fix the files first.
+
 See [Skills](/tools/skills) for the exact skill list overhead formula.
