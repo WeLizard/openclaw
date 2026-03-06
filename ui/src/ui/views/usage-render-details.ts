@@ -257,7 +257,7 @@ function renderSessionDetailPanel(
   const headerStats = filteredUsage
     ? { totalTokens: filteredUsage.totalTokens, totalCost: filteredUsage.totalCost }
     : { totalTokens: usage?.totalTokens ?? 0, totalCost: usage?.totalCost ?? 0 };
-  const cursorIndicator = filteredUsage ? " (filtered)" : "";
+  const cursorIndicator = filteredUsage ? ` ${t("usage.filteredTag")}` : "";
 
   return html`
     <div class="card session-detail-panel">
@@ -272,7 +272,7 @@ function renderSessionDetailPanel(
           ${
             usage
               ? html`
-            <span><strong>${formatTokens(headerStats.totalTokens)}</strong> tokens${cursorIndicator}</span>
+            <span><strong>${formatTokens(headerStats.totalTokens)}</strong> ${t("usage.tokens")}${cursorIndicator}</span>
             <span><strong>${formatCost(headerStats.totalCost)}</strong>${cursorIndicator}</span>
           `
               : nothing
@@ -539,13 +539,17 @@ function renderTimeSeriesCompact(
                 hour: "2-digit",
                 minute: "2-digit",
               }),
-              `${formatTokens(val)} tokens`,
+              t("usage.tokensWithValue", { value: formatTokens(val) }),
             ];
             if (breakdownByType) {
-              tooltipLines.push(`Out ${formatTokens(p.output)}`);
-              tooltipLines.push(`In ${formatTokens(p.input)}`);
-              tooltipLines.push(`CW ${formatTokens(p.cacheWrite)}`);
-              tooltipLines.push(`CR ${formatTokens(p.cacheRead)}`);
+              tooltipLines.push(t("usage.outputShortWithValue", { value: formatTokens(p.output) }));
+              tooltipLines.push(t("usage.inputShortWithValue", { value: formatTokens(p.input) }));
+              tooltipLines.push(
+                t("usage.cacheWriteShortWithValue", { value: formatTokens(p.cacheWrite) }),
+              );
+              tooltipLines.push(
+                t("usage.cacheReadShortWithValue", { value: formatTokens(p.cacheRead) }),
+              );
             }
             const tooltip = tooltipLines.join(" · ");
             const isOutside = hasSelection && (i < rangeStartIdx || i >= rangeEndIdx);
@@ -677,12 +681,16 @@ function renderTimeSeriesCompact(
         ${
           hasSelection
             ? html`
-              <span style="color: var(--accent);">▶ Turns ${rangeStartIdx + 1}–${rangeEndIdx} of ${points.length}</span> · 
+              <span style="color: var(--accent);">${t("usage.turnsRange", {
+                start: String(rangeStartIdx + 1),
+                end: String(rangeEndIdx),
+                total: String(points.length),
+              })}</span> · 
               ${new Date(rangeStartTs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}–${new Date(rangeEndTs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} · 
               ${formatTokens(filteredOutput + filteredInput + filteredCacheRead + filteredCacheWrite)} · 
               ${formatCost(filteredPoints.reduce((s, p) => s + (p.cost || 0), 0))}
             `
-            : html`${points.length} msgs · ${formatTokens(cumTokens)} · ${formatCost(cumCost)}`
+            : html`${t("usage.messagesCount", { count: String(points.length) })} · ${formatTokens(cumTokens)} · ${formatCost(cumCost)}`
         }
       </div>
       ${
@@ -697,20 +705,30 @@ function renderTimeSeriesCompact(
                   <div class="cost-segment cache-read" style="width: ${pct(filteredCacheRead, totalTypeTokens).toFixed(1)}%"></div>
                 </div>
                 <div class="cost-breakdown-legend">
-                  <div class="legend-item" title="Assistant output tokens">
-                    <span class="legend-dot output"></span>Output ${formatTokens(filteredOutput)}
+                  <div class="legend-item" title=${t("usage.assistantOutputTokens")}>
+                    <span class="legend-dot output"></span>${t("usage.outputWithValue", {
+                      value: formatTokens(filteredOutput),
+                    })}
                   </div>
-                  <div class="legend-item" title="User + tool input tokens">
-                    <span class="legend-dot input"></span>Input ${formatTokens(filteredInput)}
+                  <div class="legend-item" title=${t("usage.userToolInputTokens")}>
+                    <span class="legend-dot input"></span>${t("usage.inputWithValue", {
+                      value: formatTokens(filteredInput),
+                    })}
                   </div>
-                  <div class="legend-item" title="Tokens written to cache">
-                    <span class="legend-dot cache-write"></span>Cache Write ${formatTokens(filteredCacheWrite)}
+                  <div class="legend-item" title=${t("usage.tokensWrittenToCache")}>
+                    <span class="legend-dot cache-write"></span>${t("usage.cacheWriteWithValue", {
+                      value: formatTokens(filteredCacheWrite),
+                    })}
                   </div>
-                  <div class="legend-item" title="Tokens read from cache">
-                    <span class="legend-dot cache-read"></span>Cache Read ${formatTokens(filteredCacheRead)}
+                  <div class="legend-item" title=${t("usage.tokensReadFromCache")}>
+                    <span class="legend-dot cache-read"></span>${t("usage.cacheReadWithValue", {
+                      value: formatTokens(filteredCacheRead),
+                    })}
                   </div>
                 </div>
-                <div class="cost-breakdown-total">Total: ${formatTokens(totalTypeTokens)}</div>
+                <div class="cost-breakdown-total">
+                  ${t("usage.totalLabel")}: ${formatTokens(totalTypeTokens)}
+                </div>
               </div>
             `
           : nothing
@@ -746,7 +764,9 @@ function renderContextPanel(
   if (usage && usage.totalTokens > 0) {
     const inputTokens = usage.input + usage.cacheRead;
     if (inputTokens > 0) {
-      contextPct = `~${Math.min((totalContextTokens / inputTokens) * 100, 100).toFixed(0)}% of input`;
+      contextPct = t("usage.contextOfInput", {
+        percent: String(Math.min((totalContextTokens / inputTokens) * 100, 100).toFixed(0)),
+      });
     }
   }
 
@@ -780,21 +800,21 @@ function renderContextPanel(
         }
       </div>
       <p class="context-weight-desc">
-        ${contextPct || "Base context per message"}
+        ${contextPct || t("usage.baseContextPerMessage")}
       </p>
       <div class="context-stacked-bar">
-        <div class="context-segment system" style="width: ${pct(systemTokens, totalContextTokens).toFixed(1)}%" title="System: ~${formatTokens(systemTokens)}"></div>
-        <div class="context-segment skills" style="width: ${pct(skillsTokens, totalContextTokens).toFixed(1)}%" title="Skills: ~${formatTokens(skillsTokens)}"></div>
-        <div class="context-segment tools" style="width: ${pct(toolsTokens, totalContextTokens).toFixed(1)}%" title="Tools: ~${formatTokens(toolsTokens)}"></div>
-        <div class="context-segment files" style="width: ${pct(filesTokens, totalContextTokens).toFixed(1)}%" title="Files: ~${formatTokens(filesTokens)}"></div>
+        <div class="context-segment system" style="width: ${pct(systemTokens, totalContextTokens).toFixed(1)}%" title=${t("usage.systemWithValue", { value: formatTokens(systemTokens) })}></div>
+        <div class="context-segment skills" style="width: ${pct(skillsTokens, totalContextTokens).toFixed(1)}%" title=${t("usage.skillsWithValue", { value: formatTokens(skillsTokens) })}></div>
+        <div class="context-segment tools" style="width: ${pct(toolsTokens, totalContextTokens).toFixed(1)}%" title=${t("usage.toolsWithValue", { value: formatTokens(toolsTokens) })}></div>
+        <div class="context-segment files" style="width: ${pct(filesTokens, totalContextTokens).toFixed(1)}%" title=${t("usage.filesWithValue", { value: formatTokens(filesTokens) })}></div>
       </div>
       <div class="context-legend">
-        <span class="legend-item"><span class="legend-dot system"></span>Sys ~${formatTokens(systemTokens)}</span>
-        <span class="legend-item"><span class="legend-dot skills"></span>Skills ~${formatTokens(skillsTokens)}</span>
-        <span class="legend-item"><span class="legend-dot tools"></span>Tools ~${formatTokens(toolsTokens)}</span>
-        <span class="legend-item"><span class="legend-dot files"></span>Files ~${formatTokens(filesTokens)}</span>
+        <span class="legend-item"><span class="legend-dot system"></span>${t("usage.systemShortWithValue", { value: formatTokens(systemTokens) })}</span>
+        <span class="legend-item"><span class="legend-dot skills"></span>${t("usage.skillsWithValue", { value: formatTokens(skillsTokens) })}</span>
+        <span class="legend-item"><span class="legend-dot tools"></span>${t("usage.toolsWithValue", { value: formatTokens(toolsTokens) })}</span>
+        <span class="legend-item"><span class="legend-dot files"></span>${t("usage.filesWithValue", { value: formatTokens(filesTokens) })}</span>
       </div>
-      <div class="context-total">Total: ~${formatTokens(totalContextTokens)}</div>
+      <div class="context-total">${t("usage.totalLabel")}: ~${formatTokens(totalContextTokens)}</div>
       <div class="context-breakdown-grid">
         ${
           skillsList.length > 0
@@ -802,7 +822,9 @@ function renderContextPanel(
                 const more = skillsList.length - skillsTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Skills (${skillsList.length})</div>
+                    <div class="context-breakdown-title">${t("usage.contextSkillsTitle", {
+                      count: String(skillsList.length),
+                    })}</div>
                     <div class="context-breakdown-list">
                       ${skillsTop.map(
                         (s) => html`
@@ -815,7 +837,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">${t("usage.moreCount", { count: String(more) })}</div>`
                         : nothing
                     }
                   </div>
@@ -829,7 +851,9 @@ function renderContextPanel(
                 const more = toolsList.length - toolsTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Tools (${toolsList.length})</div>
+                    <div class="context-breakdown-title">${t("usage.contextToolsTitle", {
+                      count: String(toolsList.length),
+                    })}</div>
                     <div class="context-breakdown-list">
                       ${toolsTop.map(
                         (t) => html`
@@ -842,7 +866,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">${t("usage.moreCount", { count: String(more) })}</div>`
                         : nothing
                     }
                   </div>
@@ -856,7 +880,9 @@ function renderContextPanel(
                 const more = filesList.length - filesTop.length;
                 return html`
                   <div class="context-breakdown-card">
-                    <div class="context-breakdown-title">Files (${filesList.length})</div>
+                    <div class="context-breakdown-title">${t("usage.contextFilesTitle", {
+                      count: String(filesList.length),
+                    })}</div>
                     <div class="context-breakdown-list">
                       ${filesTop.map(
                         (f) => html`
@@ -869,7 +895,7 @@ function renderContextPanel(
                     </div>
                     ${
                       more > 0
-                        ? html`<div class="context-breakdown-more">+${more} more</div>`
+                        ? html`<div class="context-breakdown-more">${t("usage.moreCount", { count: String(more) })}</div>`
                         : nothing
                     }
                   </div>
@@ -965,7 +991,10 @@ function renderSessionLogsCompact(
   const hasCursorFilter = cursorStart != null && cursorEnd != null;
   const displayedCount =
     hasActiveFilters || hasCursorFilter
-      ? `${filteredEntries.length} of ${logs.length} ${hasCursorFilter ? "(timeline filtered)" : ""}`
+      ? `${t("usage.filteredMessagesCount", {
+          shown: String(filteredEntries.length),
+          total: String(logs.length),
+        })}${hasCursorFilter ? ` ${t("usage.timelineFiltered")}` : ""}`
       : `${logs.length}`;
 
   const roleSelected = new Set(filters.roles);

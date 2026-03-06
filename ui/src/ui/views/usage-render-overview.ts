@@ -209,16 +209,20 @@ function renderDailyChartCompact(
               dailyChartMode === "by-type"
                 ? isTokenMode
                   ? [
-                      `Output ${formatTokens(d.output)}`,
-                      `Input ${formatTokens(d.input)}`,
-                      `Cache write ${formatTokens(d.cacheWrite)}`,
-                      `Cache read ${formatTokens(d.cacheRead)}`,
+                      t("usage.outputWithValue", { value: formatTokens(d.output) }),
+                      t("usage.inputWithValue", { value: formatTokens(d.input) }),
+                      t("usage.cacheWriteWithValue", { value: formatTokens(d.cacheWrite) }),
+                      t("usage.cacheReadWithValue", { value: formatTokens(d.cacheRead) }),
                     ]
                   : [
-                      `Output ${formatCost(d.outputCost ?? 0)}`,
-                      `Input ${formatCost(d.inputCost ?? 0)}`,
-                      `Cache write ${formatCost(d.cacheWriteCost ?? 0)}`,
-                      `Cache read ${formatCost(d.cacheReadCost ?? 0)}`,
+                      t("usage.outputWithValue", { value: formatCost(d.outputCost ?? 0) }),
+                      t("usage.inputWithValue", { value: formatCost(d.inputCost ?? 0) }),
+                      t("usage.cacheWriteWithValue", {
+                        value: formatCost(d.cacheWriteCost ?? 0),
+                      }),
+                      t("usage.cacheReadWithValue", {
+                        value: formatCost(d.cacheReadCost ?? 0),
+                      }),
                     ]
                 : [];
             const totalLabel = isTokenMode ? formatTokens(d.totalTokens) : formatCost(d.totalCost);
@@ -255,7 +259,7 @@ function renderDailyChartCompact(
                 <div class="daily-bar-label" style="${labelStyle}">${shortLabel}</div>
                 <div class="daily-bar-tooltip">
                   <strong>${formatFullDate(d.date)}</strong><br />
-                  ${formatTokens(d.totalTokens)} tokens<br />
+                  ${t("usage.tokensWithValue", { value: formatTokens(d.totalTokens) })}<br />
                   ${formatCost(d.totalCost)}
                   ${
                     breakdownLines.length
@@ -288,19 +292,39 @@ function renderCostBreakdownCompact(totals: UsageTotals, mode: "tokens" | "cost"
       <div class="cost-breakdown-header">${isTokenMode ? t("usage.tokens") : t("usage.cost")} ${t("usage.byType")}</div>
       <div class="cost-breakdown-bar">
         <div class="cost-segment output" style="width: ${(isTokenMode ? tokenPcts.output : breakdown.output.pct).toFixed(1)}%"
-          title="Output: ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}"></div>
+          title=${t("usage.outputWithValue", {
+            value: isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost),
+          })}></div>
         <div class="cost-segment input" style="width: ${(isTokenMode ? tokenPcts.input : breakdown.input.pct).toFixed(1)}%"
-          title="Input: ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}"></div>
+          title=${t("usage.inputWithValue", {
+            value: isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost),
+          })}></div>
         <div class="cost-segment cache-write" style="width: ${(isTokenMode ? tokenPcts.cacheWrite : breakdown.cacheWrite.pct).toFixed(1)}%"
-          title="Cache Write: ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}"></div>
+          title=${t("usage.cacheWriteWithValue", {
+            value: isTokenMode
+              ? formatTokens(totals.cacheWrite)
+              : formatCost(breakdown.cacheWrite.cost),
+          })}></div>
         <div class="cost-segment cache-read" style="width: ${(isTokenMode ? tokenPcts.cacheRead : breakdown.cacheRead.pct).toFixed(1)}%"
-          title="Cache Read: ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}"></div>
+          title=${t("usage.cacheReadWithValue", {
+            value: isTokenMode
+              ? formatTokens(totals.cacheRead)
+              : formatCost(breakdown.cacheRead.cost),
+          })}></div>
       </div>
       <div class="cost-breakdown-legend">
-        <span class="legend-item"><span class="legend-dot output"></span>Output ${isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost)}</span>
-        <span class="legend-item"><span class="legend-dot input"></span>Input ${isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost)}</span>
-        <span class="legend-item"><span class="legend-dot cache-write"></span>Cache Write ${isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost)}</span>
-        <span class="legend-item"><span class="legend-dot cache-read"></span>Cache Read ${isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost)}</span>
+        <span class="legend-item"><span class="legend-dot output"></span>${t("usage.outputWithValue", {
+          value: isTokenMode ? formatTokens(totals.output) : formatCost(breakdown.output.cost),
+        })}</span>
+        <span class="legend-item"><span class="legend-dot input"></span>${t("usage.inputWithValue", {
+          value: isTokenMode ? formatTokens(totals.input) : formatCost(breakdown.input.cost),
+        })}</span>
+        <span class="legend-item"><span class="legend-dot cache-write"></span>${t("usage.cacheWriteWithValue", {
+          value: isTokenMode ? formatTokens(totals.cacheWrite) : formatCost(breakdown.cacheWrite.cost),
+        })}</span>
+        <span class="legend-item"><span class="legend-dot cache-read"></span>${t("usage.cacheReadWithValue", {
+          value: isTokenMode ? formatTokens(totals.cacheRead) : formatCost(breakdown.cacheRead.cost),
+        })}</span>
       </div>
       <div class="cost-breakdown-total">
         ${t("usage.totalLabel")}: ${isTokenMode ? formatTokens(totals.totalTokens) : formatCost(totals.totalCost)}
@@ -392,23 +416,25 @@ function renderUsageInsights(
   const errorRatePct = stats.errorRate * 100;
   const throughputLabel =
     stats.throughputTokensPerMin !== undefined
-      ? `${formatTokens(Math.round(stats.throughputTokensPerMin))} tok/min`
+      ? t("usage.tokensPerMin", {
+          value: formatTokens(Math.round(stats.throughputTokensPerMin)),
+        })
       : "—";
   const throughputCostLabel =
     stats.throughputCostPerMin !== undefined
-      ? `${formatCost(stats.throughputCostPerMin, 4)} / min`
+      ? t("usage.costPerMin", { value: formatCost(stats.throughputCostPerMin, 4) })
       : "—";
   const avgDurationLabel =
     stats.durationCount > 0
       ? (formatDurationCompact(stats.avgDurationMs, { spaced: true }) ?? "—")
       : "—";
-  const cacheHint = "Cache hit rate = cache read / (input + cache read). Higher is better.";
-  const errorHint = "Error rate = errors / total messages. Lower is better.";
-  const throughputHint = "Throughput shows tokens per minute over active time. Higher is better.";
-  const tokensHint = "Average tokens per message in this range.";
+  const cacheHint = t("usage.cacheHitHint");
+  const errorHint = t("usage.errorRateHint");
+  const throughputHint = t("usage.throughputHint");
+  const tokensHint = t("usage.avgTokensHint");
   const costHint = showCostHint
-    ? "Average cost per message when providers report costs. Cost data is missing for some or all sessions in this range."
-    : "Average cost per message when providers report costs.";
+    ? t("usage.avgCostHintMissing")
+    : t("usage.avgCostHint");
 
   const errorDays = aggregates.daily
     .filter((day) => day.messages > 0 && day.errors > 0)
@@ -417,7 +443,11 @@ function renderUsageInsights(
       return {
         label: formatDayLabel(day.date),
         value: `${(rate * 100).toFixed(2)}%`,
-        sub: `${day.errors} errors · ${day.messages} msgs · ${formatTokens(day.tokens)}`,
+        sub: t("usage.errorDaySummary", {
+          errors: String(day.errors),
+          messages: String(day.messages),
+          tokens: formatTokens(day.tokens),
+        }),
         rate,
       };
     })
@@ -426,19 +456,25 @@ function renderUsageInsights(
     .map(({ rate: _rate, ...rest }) => rest);
 
   const topModels = aggregates.byModel.slice(0, 5).map((entry) => ({
-    label: entry.model ?? "unknown",
+    label: entry.model ?? t("common.unknown"),
     value: formatCost(entry.totals.totalCost),
-    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} msgs`,
+    sub: t("usage.tokensAndMsgs", {
+      tokens: formatTokens(entry.totals.totalTokens),
+      count: String(entry.count),
+    }),
   }));
   const topProviders = aggregates.byProvider.slice(0, 5).map((entry) => ({
-    label: entry.provider ?? "unknown",
+    label: entry.provider ?? t("common.unknown"),
     value: formatCost(entry.totals.totalCost),
-    sub: `${formatTokens(entry.totals.totalTokens)} · ${entry.count} msgs`,
+    sub: t("usage.tokensAndMsgs", {
+      tokens: formatTokens(entry.totals.totalTokens),
+      count: String(entry.count),
+    }),
   }));
   const topTools = aggregates.tools.tools.slice(0, 6).map((tool) => ({
     label: tool.name,
     value: `${tool.count}`,
-    sub: "calls",
+    sub: t("usage.calls"),
   }));
   const topAgents = aggregates.byAgent.slice(0, 5).map((entry) => ({
     label: entry.agentId,
@@ -458,7 +494,7 @@ function renderUsageInsights(
         <div class="usage-summary-card">
           <div class="usage-summary-title">
             ${t("usage.messages")}
-            <span class="usage-summary-hint" title="Total user + assistant messages in range.">?</span>
+            <span class="usage-summary-hint" title=${t("usage.messagesTotalHint")}>?</span>
           </div>
           <div class="usage-summary-value">${aggregates.messages.total}</div>
           <div class="usage-summary-sub">
@@ -471,7 +507,7 @@ function renderUsageInsights(
         <div class="usage-summary-card">
           <div class="usage-summary-title">
             ${t("usage.toolCalls")}
-            <span class="usage-summary-hint" title="Total tool call count across sessions.">?</span>
+            <span class="usage-summary-hint" title=${t("usage.toolCallsTotalHint")}>?</span>
           </div>
           <div class="usage-summary-value">${aggregates.tools.totalCalls}</div>
           <div class="usage-summary-sub">${t("usage.toolsUsed", { count: String(aggregates.tools.uniqueTools) })}</div>
@@ -479,7 +515,7 @@ function renderUsageInsights(
         <div class="usage-summary-card">
           <div class="usage-summary-title">
             ${t("usage.errors")}
-            <span class="usage-summary-hint" title="Total message/tool errors in range.">?</span>
+            <span class="usage-summary-hint" title=${t("usage.errorsTotalHint")}>?</span>
           </div>
           <div class="usage-summary-value">${aggregates.messages.errors}</div>
           <div class="usage-summary-sub">${t("usage.toolResults", { count: String(aggregates.messages.toolResults) })}</div>
@@ -503,7 +539,7 @@ function renderUsageInsights(
         <div class="usage-summary-card">
           <div class="usage-summary-title">
             ${t("usage.sessions")}
-            <span class="usage-summary-hint" title="Distinct sessions in the range.">?</span>
+            <span class="usage-summary-hint" title=${t("usage.distinctSessionsHint")}>?</span>
           </div>
           <div class="usage-summary-value">${sessionCount}</div>
           <div class="usage-summary-sub">${t("usage.ofTotalInRange", { total: String(totalSessions) })}</div>
