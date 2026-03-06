@@ -405,6 +405,34 @@ describe("config form renderer", () => {
     expect(analysis.unsupportedPaths).not.toContain("note");
   });
 
+  it("supports allOf object composition in form analysis", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        telegram: {
+          allOf: [
+            {
+              type: "object",
+              properties: {
+                enabled: { type: "boolean" },
+              },
+            },
+            {
+              type: "object",
+              properties: {
+                token: { type: "string" },
+              },
+            },
+          ],
+        },
+      },
+    };
+    const analysis = analyzeConfigSchema(schema);
+    expect(analysis.unsupportedPaths).not.toContain("telegram");
+    expect((analysis.schema?.properties?.telegram?.properties ?? {}).enabled).toBeTruthy();
+    expect((analysis.schema?.properties?.telegram?.properties ?? {}).token).toBeTruthy();
+  });
+
   it("ignores untyped additionalProperties schemas", () => {
     const schema = {
       type: "object",
