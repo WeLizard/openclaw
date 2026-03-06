@@ -1,9 +1,13 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { defaultRuntime } from "../runtime.js";
 import {
   applyCustomApiConfig,
+  finalizeCustomApiConfig,
   parseNonInteractiveCustomApiFlags,
   promptCustomApiConfig,
 } from "./onboard-custom.js";
@@ -131,6 +135,40 @@ describe("promptCustomApiConfig", () => {
 
     expectOpenAiCompatResult({ prompter, textCalls: 5, selectCalls: 2, result });
     expect(result.config.agents?.defaults?.models?.["custom/llama3"]?.alias).toBe("local");
+  });
+
+  it("finalizes custom provider into auth-profiles and strips inline apiKey", async () => {
+    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-custom-provider-auth-"));
+    try {
+      const result = applyCustomApiConfig({
+        config: {},
+        baseUrl: "http://192.168.0.52:8317/v1",
+        modelId: "gpt-5.4",
+        compatibility: "openai",
+        apiKey: "my-dev-key",
+        providerId: "cliproxy",
+        alias: "gpt-5.4",
+      });
+
+      const finalized = await finalizeCustomApiConfig({ result, agentDir });
+      const authStorePath = path.join(agentDir, "auth-profiles.json");
+      const authStore = JSON.parse(await fs.readFile(authStorePath, "utf8")) as {
+        profiles?: Record<string, { type?: string; provider?: string; key?: string }>;
+      };
+
+      expect(authStore.profiles?.["cliproxy:default"]).toMatchObject({
+        type: "api_key",
+        provider: "cliproxy",
+        key: "my-dev-key",
+      });
+      expect(finalized.auth?.profiles?.["cliproxy:default"]).toMatchObject({
+        provider: "cliproxy",
+        mode: "api_key",
+      });
+      expect(finalized.models?.providers?.cliproxy?.apiKey).toBeUndefined();
+    } finally {
+      await fs.rm(agentDir, { recursive: true, force: true });
+    }
   });
 
   it("retries when verification fails", async () => {

@@ -141,6 +141,10 @@ export const ru: TranslationMap = {
       countBlocked: "Заблокировано",
       activeProfile: "Активный",
       noProfiles: "Для этого провайдера не сохранены профили.",
+      staticConfig:
+        "Этот провайдер использует статический API key из openclaw.json; auth-профили для него не требуются.",
+      envConfig:
+        "Этот провайдер использует ключ из переменных окружения; auth-профили для него не требуются.",
       makePrimary: "Сделать основным",
       oauthReauth: "Настроить авторизацию",
       clearCooldown: "Сбросить cooldown",

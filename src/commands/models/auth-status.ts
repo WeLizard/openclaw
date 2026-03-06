@@ -106,6 +106,18 @@ function rankProviderStatus(status: ModelsAuthProviderStatus["status"]): number 
   }
 }
 
+function resolveProviderStatus(params: {
+  effectiveKind: ProviderAuthOverview["effective"]["kind"];
+  providerHealthStatus: ModelsAuthProviderStatus["status"] | undefined;
+}): ModelsAuthProviderStatus["status"] {
+  if (params.effectiveKind === "models.json" || params.effectiveKind === "env") {
+    if (!params.providerHealthStatus || params.providerHealthStatus === "missing") {
+      return "static";
+    }
+  }
+  return params.providerHealthStatus ?? "missing";
+}
+
 function resolveTargetAgent(rawAgentId?: string): ResolvedTargetAgent {
   const cfg = loadConfig();
   const agentId = resolveKnownAgentId({ cfg, rawAgentId }) ?? resolveDefaultAgentId(cfg);
@@ -296,7 +308,10 @@ export function getModelsAuthStatus(rawAgentId?: string): ModelsAuthStatusResult
       const providerHealth = healthByProvider.get(providerKey);
       return {
         provider: providerKey,
-        status: providerHealth?.status ?? "missing",
+        status: resolveProviderStatus({
+          effectiveKind: entry.effective.kind,
+          providerHealthStatus: providerHealth?.status,
+        }),
         inUse: providersInUse.includes(providerKey),
         effective: entry.effective,
         counts: {

@@ -16,6 +16,9 @@ const warnIfModelConfigLooksOff = vi.hoisted(() => vi.fn(async () => {}));
 const applyPrimaryModel = vi.hoisted(() => vi.fn((cfg) => cfg));
 const promptDefaultModel = vi.hoisted(() => vi.fn(async () => ({ config: null, model: null })));
 const promptCustomApiConfig = vi.hoisted(() => vi.fn(async (args) => ({ config: args.config })));
+const finalizeCustomApiConfig = vi.hoisted(() =>
+  vi.fn(async ({ result }: { result: { config: unknown } }) => result.config),
+);
 const configureGatewayForOnboarding = vi.hoisted(() =>
   vi.fn(async (args) => ({
     nextConfig: args.nextConfig,
@@ -118,6 +121,7 @@ vi.mock("../commands/model-picker.js", () => ({
 
 vi.mock("../commands/onboard-custom.js", () => ({
   promptCustomApiConfig,
+  finalizeCustomApiConfig,
 }));
 
 vi.mock("../commands/health.js", () => ({

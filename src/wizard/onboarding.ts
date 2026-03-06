@@ -89,7 +89,7 @@ async function runProviderAuthWizard(
 
   const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
   const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
-  const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const { finalizeCustomApiConfig, promptCustomApiConfig } = await import("../commands/onboard-custom.js");
   const { applyAuthChoice } = await import("../commands/auth-choice.js");
   const { logConfigUpdated } = await import("../config/logging.js");
 
@@ -112,7 +112,7 @@ async function runProviderAuthWizard(
       config: nextConfig,
       secretInputMode: opts.secretInputMode,
     });
-    nextConfig = customResult.config;
+    nextConfig = await finalizeCustomApiConfig({ result: customResult });
   } else {
     const authResult = await applyAuthChoice({
       authChoice,
@@ -476,7 +476,7 @@ export async function runOnboardingWizard(
 
   const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
   const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
-  const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const { finalizeCustomApiConfig, promptCustomApiConfig } = await import("../commands/onboard-custom.js");
   const { applyAuthChoice, resolvePreferredProviderForAuthChoice, warnIfModelConfigLooksOff } =
     await import("../commands/auth-choice.js");
   const { applyPrimaryModel, promptDefaultModel } = await import("../commands/model-picker.js");
@@ -500,7 +500,7 @@ export async function runOnboardingWizard(
       config: nextConfig,
       secretInputMode: opts.secretInputMode,
     });
-    nextConfig = customResult.config;
+    nextConfig = await finalizeCustomApiConfig({ result: customResult });
   } else {
     const authResult = await applyAuthChoice({
       authChoice,

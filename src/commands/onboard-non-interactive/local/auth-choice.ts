@@ -60,6 +60,7 @@ import {
 import {
   applyCustomApiConfig,
   CustomApiError,
+  finalizeCustomApiConfig,
   parseNonInteractiveCustomApiFlags,
   resolveCustomProviderId,
 } from "../../onboard-custom.js";
@@ -971,7 +972,7 @@ export async function applyNonInteractiveAuthChoice(params: {
           `Custom provider ID "${result.providerIdRenamedFrom}" already exists for a different base URL. Using "${result.providerId}".`,
         );
       }
-      return result.config;
+      return await finalizeCustomApiConfig({ result });
     } catch (err) {
       if (err instanceof CustomApiError) {
         switch (err.code) {

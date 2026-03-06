@@ -152,7 +152,8 @@ describe("setup wizard controller", () => {
   });
 
   it("starts provider auth without forcing a provider id", async () => {
-    const request = vi.fn(async (method: string) => {
+    const request = vi.fn(async (...args: unknown[]) => {
+      const method = args[0] as string;
       if (method === "wizard.start") {
         return {
           sessionId: "provider-auth-session",

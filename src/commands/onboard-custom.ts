@@ -14,6 +14,8 @@ import type { WizardPrompter } from "../wizard/prompts.js";
 import { ensureApiKeyFromEnvOrPrompt } from "./auth-choice.apply-helpers.js";
 import { applyPrimaryModel } from "./model-picker.js";
 import { normalizeAlias } from "./models/shared.js";
+import { applyAuthProfileConfig } from "./onboard-auth.config-core.js";
+import { setCustomProviderApiKey } from "./onboard-auth.credentials.js";
 import type { SecretInputMode } from "./onboard-types.js";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
@@ -68,6 +70,11 @@ export type CustomApiResult = {
   providerId?: string;
   modelId?: string;
   providerIdRenamedFrom?: string;
+  authProfile?: {
+    profileId: string;
+    provider: string;
+    apiKey: SecretInput;
+  };
 };
 
 export type ApplyCustomApiConfigParams = {
@@ -548,8 +555,49 @@ export function parseNonInteractiveCustomApiFlags(
     modelId,
     compatibility: parseCustomApiCompatibility(params.compatibility),
     ...(apiKey ? { apiKey } : {}),
-    ...(providerId ? { providerId } : {}),
+  ...(providerId ? { providerId } : {}),
   };
+}
+
+export function stripInlineApiKeyFromProviderConfig(
+  cfg: OpenClawConfig,
+  providerId: string,
+): OpenClawConfig {
+  const providers = cfg.models?.providers;
+  const provider = providers?.[providerId];
+  if (!providers || !provider || !("apiKey" in provider)) {
+    return cfg;
+  }
+  const { apiKey: _apiKey, ...providerRest } = provider;
+  return {
+    ...cfg,
+    models: {
+      ...cfg.models,
+      providers: {
+        ...providers,
+        [providerId]: providerRest,
+      },
+    },
+  };
+}
+
+export async function finalizeCustomApiConfig(params: {
+  result: CustomApiResult;
+  agentDir?: string;
+}): Promise<OpenClawConfig> {
+  const authProfile = params.result.authProfile;
+  if (!authProfile) {
+    return params.result.config;
+  }
+
+  await setCustomProviderApiKey(authProfile.provider, authProfile.apiKey, params.agentDir);
+  let next = stripInlineApiKeyFromProviderConfig(params.result.config, authProfile.provider);
+  next = applyAuthProfileConfig(next, {
+    profileId: authProfile.profileId,
+    provider: authProfile.provider,
+    mode: "api_key",
+  });
+  return next;
 }
 
 export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): CustomApiResult {
@@ -663,6 +711,15 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
     config,
     providerId,
     modelId,
+    ...(normalizedApiKey
+      ? {
+          authProfile: {
+            profileId: `${providerId}:default`,
+            provider: providerId,
+            apiKey: normalizedApiKey,
+          },
+        }
+      : {}),
     ...(providerIdResult.providerIdRenamedFrom
       ? { providerIdRenamedFrom: providerIdResult.providerIdRenamedFrom }
       : {}),

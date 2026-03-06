@@ -2383,7 +2383,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding-right: 4px;
+  /* Leave room for the active focus ring so it is not clipped by the scroll container. */
+  padding: 3px;
+  scroll-padding: 3px;
 }
 
 .wizard-option {

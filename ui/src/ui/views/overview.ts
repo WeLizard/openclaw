@@ -87,6 +87,20 @@ function formatEffectiveSource(entry: ModelsAuthProviderStatus) {
   return t("overview.accounts.sourceMissing");
 }
 
+function renderProviderEmptyState(entry: ModelsAuthProviderStatus) {
+  if (entry.effective.kind === "models.json") {
+    return html`<div class="callout info" style="margin-top: 14px;">
+      ${t("overview.accounts.staticConfig")}
+    </div>`;
+  }
+  if (entry.effective.kind === "env") {
+    return html`<div class="callout info" style="margin-top: 14px;">
+      ${t("overview.accounts.envConfig")}
+    </div>`;
+  }
+  return html`<div class="callout info" style="margin-top: 14px;">${t("overview.accounts.noProfiles")}</div>`;
+}
+
 function formatProfileType(type: ModelsAuthProfileStatus["type"]) {
   if (type === "oauth") {
     return t("overview.accounts.typeOauth");
@@ -274,7 +288,7 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
       </div>
 
       ${entry.profiles.length === 0
-        ? html`<div class="callout info" style="margin-top: 14px;">${t("overview.accounts.noProfiles")}</div>`
+        ? renderProviderEmptyState(entry)
         : html`<div class="overview-auth-profile-list">
             ${entry.profiles.map((profile) => renderProfileRow(entry, profile, props))}
           </div>`}

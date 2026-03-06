@@ -140,6 +140,10 @@ export const en: TranslationMap = {
       countBlocked: "Blocked",
       activeProfile: "Active",
       noProfiles: "No profiles are stored for this provider.",
+      staticConfig:
+        "This provider uses a static API key from openclaw.json; auth profiles are not required.",
+      envConfig:
+        "This provider uses an API key from environment variables; auth profiles are not required.",
       makePrimary: "Make primary",
       oauthReauth: "Auth setup",
       clearCooldown: "Clear cooldown",

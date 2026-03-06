@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   promptModelAllowlist: vi.fn(),
   promptDefaultModel: vi.fn(),
   promptCustomApiConfig: vi.fn(),
+  finalizeCustomApiConfig: vi.fn(async ({ result }: { result: { config: unknown } }) => result.config),
 }));
 
 vi.mock("../agents/auth-profiles.js", () => ({
@@ -37,6 +38,7 @@ vi.mock("./model-picker.js", async (importActual) => {
 
 vi.mock("./onboard-custom.js", () => ({
   promptCustomApiConfig: mocks.promptCustomApiConfig,
+  finalizeCustomApiConfig: mocks.finalizeCustomApiConfig,
 }));
 
 import { promptAuthConfig } from "./configure.gateway-auth.js";
