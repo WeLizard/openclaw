@@ -110,6 +110,9 @@ function resolveProviderStatus(params: {
   effectiveKind: ProviderAuthOverview["effective"]["kind"];
   providerHealthStatus: ModelsAuthProviderStatus["status"] | undefined;
 }): ModelsAuthProviderStatus["status"] {
+  if (params.effectiveKind === "profiles" && params.providerHealthStatus === "static") {
+    return "ok";
+  }
   if (params.effectiveKind === "models.json" || params.effectiveKind === "env") {
     if (!params.providerHealthStatus || params.providerHealthStatus === "missing") {
       return "static";
