@@ -49,11 +49,12 @@ const STORAGE_KEY = "openclaw.control.setupWizard.v1";
 describe("setup wizard controller", () => {
   let storage: StorageStub;
   let startSetupWizard: typeof import("./setup-wizard.ts").startSetupWizard;
+  let submitSetupWizard: typeof import("./setup-wizard.ts").submitSetupWizard;
 
   beforeEach(async () => {
     storage = createStorage();
     vi.stubGlobal("localStorage", storage);
-    ({ startSetupWizard } = await import("./setup-wizard.ts"));
+    ({ startSetupWizard, submitSetupWizard } = await import("./setup-wizard.ts"));
   });
 
   afterEach(() => {
@@ -186,5 +187,57 @@ describe("setup wizard controller", () => {
     expect(startParams?.provider).toBeUndefined();
     expect(state.wizardIntent).toBe("models-auth-login");
     expect(state.wizardProvider).toBeNull();
+  });
+
+  it("closes a final note step when the wizard session disappears after save", async () => {
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        sessionId: "cliproxy-auth",
+        mode: "local",
+        intent: "models-auth-login",
+        provider: "cliproxy",
+        oauthOnly: false,
+        contextLabel: "cliproxy",
+      }),
+    );
+
+    const request = vi.fn(async (method: string) => {
+      if (method === "wizard.next") {
+        throw new Error("GatewayRequestError: wizard not found");
+      }
+      throw new Error(`unexpected ${method}`);
+    });
+    const loadOverview = vi.fn(async () => {});
+    const state = createState(request);
+    state.wizardOpen = true;
+    state.wizardSessionId = "cliproxy-auth";
+    state.wizardStatus = "running";
+    state.wizardIntent = "models-auth-login";
+    state.wizardProvider = "cliproxy";
+    state.wizardContextLabel = "cliproxy";
+    state.wizardStep = {
+      id: "custom-provider-done",
+      type: "note",
+      title: "Done",
+      message: "Provider saved",
+    };
+    state.loadOverview = loadOverview;
+
+    await submitSetupWizard(state);
+
+    expect(request).toHaveBeenCalledWith("wizard.next", {
+      sessionId: "cliproxy-auth",
+      answer: {
+        stepId: "custom-provider-done",
+        value: null,
+      },
+    });
+    expect(state.wizardOpen).toBe(false);
+    expect(state.wizardSessionId).toBeNull();
+    expect(state.wizardStatus).toBeNull();
+    expect(state.wizardError).toBeNull();
+    expect(loadOverview).toHaveBeenCalledTimes(1);
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
   });
 });

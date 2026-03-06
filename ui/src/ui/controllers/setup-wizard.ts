@@ -139,6 +139,10 @@ function clearPersistedSetupWizardState() {
   localStorage.removeItem(SETUP_WIZARD_STORAGE_KEY);
 }
 
+function isWizardNotFoundError(err: unknown): boolean {
+  return String(err).toLowerCase().includes("wizard not found");
+}
+
 function resolveInitialDraft(step: WizardStep | null): unknown {
   if (!step) {
     return null;
@@ -320,6 +324,12 @@ export async function submitSetupWizard(state: SetupWizardState) {
     });
     applyWizardResult(state, result);
   } catch (err) {
+    if (state.wizardStep.type === "note" && isWizardNotFoundError(err)) {
+      clearPersistedSetupWizardState();
+      resetWizardState(state);
+      void state.loadOverview?.();
+      return;
+    }
     state.wizardBusy = false;
     state.wizardError = String(err);
     state.wizardStatus = "error";
