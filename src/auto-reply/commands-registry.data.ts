@@ -354,7 +354,8 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "focus",
       nativeName: "focus",
-      description: "Привязать этот Discord-тред (или новый) к цели сессии.",
+      description:
+        "Привязать этот тред (Discord) или topic/conversation (Telegram) к цели сессии.",
       textAlias: "/focus",
       category: "management",
       args: [
@@ -369,7 +370,7 @@ function buildChatCommands(): ChatCommandDefinition[] {
     defineChatCommand({
       key: "unfocus",
       nativeName: "unfocus",
-      description: "Убрать текущую привязку Discord-треда.",
+      description: "Убрать текущую привязку треда (Discord) или topic/conversation (Telegram).",
       textAlias: "/unfocus",
       category: "management",
     }),

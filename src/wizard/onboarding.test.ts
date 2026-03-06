@@ -35,8 +35,8 @@ const configureGatewayForOnboarding = vi.hoisted(() =>
 );
 const finalizeOnboardingWizard = vi.hoisted(() =>
   vi.fn(async (options) => {
-    if (!process.env.BRAVE_API_KEY) {
-      await options.prompter.note("hint", "Web search (optional)");
+    if (!options.nextConfig?.tools?.web?.search?.provider) {
+      await options.prompter.note("Web search was skipped.", "Web search");
     }
 
     if (options.opts.skipUi) {
@@ -269,6 +269,7 @@ describe("runOnboardingWizard", () => {
           installDaemon: false,
           skipProviders: true,
           skipSkills: true,
+          skipSearch: true,
           skipHealth: true,
           skipUi: true,
         },
@@ -297,6 +298,7 @@ describe("runOnboardingWizard", () => {
         installDaemon: false,
         skipProviders: true,
         skipSkills: true,
+        skipSearch: true,
         skipHealth: true,
         skipUi: true,
       },
@@ -341,6 +343,7 @@ describe("runOnboardingWizard", () => {
         authChoice: "skip",
         skipProviders: true,
         skipSkills: true,
+        skipSearch: true,
         skipHealth: true,
         installDaemon: false,
       },
@@ -381,6 +384,7 @@ describe("runOnboardingWizard", () => {
           installDaemon: false,
           skipProviders: true,
           skipSkills: true,
+          skipSearch: true,
           skipHealth: true,
           skipUi: true,
         },
@@ -390,7 +394,7 @@ describe("runOnboardingWizard", () => {
 
       const calls = (note as unknown as { mock: { calls: unknown[][] } }).mock.calls;
       expect(calls.length).toBeGreaterThan(0);
-      expect(calls.some((call) => call?.[1] === "Web search (optional)")).toBe(true);
+      expect(calls.some((call) => call?.[1] === "Web search")).toBe(true);
     } finally {
       if (prevBraveKey === undefined) {
         delete process.env.BRAVE_API_KEY;
@@ -531,6 +535,7 @@ describe("runOnboardingWizard", () => {
           installDaemon: false,
           skipProviders: true,
           skipSkills: true,
+          skipSearch: true,
           skipHealth: true,
           skipUi: true,
         },
@@ -567,6 +572,7 @@ describe("runOnboardingWizard", () => {
         installDaemon: false,
         skipProviders: true,
         skipSkills: true,
+        skipSearch: true,
         skipHealth: true,
         skipUi: true,
         secretInputMode: "ref",
