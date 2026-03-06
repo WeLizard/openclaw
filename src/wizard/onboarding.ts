@@ -89,31 +89,53 @@ async function runProviderAuthWizard(
 
   const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
   const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
-  const { finalizeCustomApiConfig, promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const {
+    finalizeCustomApiConfig,
+    promptCustomApiConfig,
+    resolveExistingCustomProviderContext,
+  } = await import("../commands/onboard-custom.js");
   const { applyAuthChoice } = await import("../commands/auth-choice.js");
   const { logConfigUpdated } = await import("../config/logging.js");
 
   const authStore = ensureAuthProfileStore(undefined, {
     allowKeychainPrompt: false,
   });
-  const authChoice = await promptAuthChoiceGrouped({
-    prompter,
-    store: authStore,
-    includeSkip: false,
-    provider: opts.provider,
-    oauthOnly: opts.oauthOnly,
-  });
-
   let nextConfig = baseConfig;
-  if (authChoice === "custom-api-key") {
+  const existingCustomProvider =
+    opts.provider && !opts.oauthOnly
+      ? resolveExistingCustomProviderContext(baseConfig, opts.provider)
+      : null;
+
+  if (existingCustomProvider) {
     const customResult = await promptCustomApiConfig({
       prompter,
       runtime,
       config: nextConfig,
       secretInputMode: opts.secretInputMode,
+      initialBaseUrl: existingCustomProvider.baseUrl,
+      initialModelId: existingCustomProvider.modelId,
+      initialProviderId: existingCustomProvider.providerId,
+      initialCompatibility: existingCustomProvider.compatibility,
     });
     nextConfig = await finalizeCustomApiConfig({ result: customResult });
   } else {
+    const authChoice = await promptAuthChoiceGrouped({
+      prompter,
+      store: authStore,
+      includeSkip: false,
+      provider: opts.provider,
+      oauthOnly: opts.oauthOnly,
+    });
+
+    if (authChoice === "custom-api-key") {
+      const customResult = await promptCustomApiConfig({
+        prompter,
+        runtime,
+        config: nextConfig,
+        secretInputMode: opts.secretInputMode,
+      });
+      nextConfig = await finalizeCustomApiConfig({ result: customResult });
+    } else {
     const authResult = await applyAuthChoice({
       authChoice,
       config: nextConfig,
@@ -122,6 +144,7 @@ async function runProviderAuthWizard(
       setDefaultModel: false,
     });
     nextConfig = authResult.config;
+    }
   }
 
   await writeConfigFile(nextConfig);

@@ -19,6 +19,7 @@ const promptCustomApiConfig = vi.hoisted(() => vi.fn(async (args) => ({ config: 
 const finalizeCustomApiConfig = vi.hoisted(() =>
   vi.fn(async ({ result }: { result: { config: unknown } }) => result.config),
 );
+const resolveExistingCustomProviderContext = vi.hoisted(() => vi.fn(() => null));
 const configureGatewayForOnboarding = vi.hoisted(() =>
   vi.fn(async (args) => ({
     nextConfig: args.nextConfig,
@@ -122,6 +123,7 @@ vi.mock("../commands/model-picker.js", () => ({
 vi.mock("../commands/onboard-custom.js", () => ({
   promptCustomApiConfig,
   finalizeCustomApiConfig,
+  resolveExistingCustomProviderContext,
 }));
 
 vi.mock("../commands/health.js", () => ({
@@ -401,6 +403,9 @@ describe("runOnboardingWizard", () => {
   it("runs provider auth flow without entering full onboarding", async () => {
     promptAuthChoiceGrouped.mockClear();
     applyAuthChoice.mockClear();
+    promptCustomApiConfig.mockClear();
+    finalizeCustomApiConfig.mockClear();
+    resolveExistingCustomProviderContext.mockClear();
     setupChannels.mockClear();
     setupSkills.mockClear();
     configureGatewayForOnboarding.mockClear();
@@ -436,6 +441,48 @@ describe("runOnboardingWizard", () => {
     expect(setupSkills).not.toHaveBeenCalled();
     expect(configureGatewayForOnboarding).not.toHaveBeenCalled();
     expect(prompter.intro).toHaveBeenCalledWith("Provider auth");
+  });
+
+  it("reuses existing custom provider context during provider auth", async () => {
+    promptAuthChoiceGrouped.mockClear();
+    applyAuthChoice.mockClear();
+    promptCustomApiConfig.mockClear();
+    finalizeCustomApiConfig.mockClear();
+    resolveExistingCustomProviderContext.mockClear();
+
+    resolveExistingCustomProviderContext.mockReturnValueOnce({
+      providerId: "cliproxy",
+      baseUrl: "http://192.168.0.52:8317/v1",
+      modelId: "gpt-5.4",
+      compatibility: "openai",
+    } as never);
+
+    const prompter = buildWizardPrompter({});
+    const runtime = createRuntime();
+
+    await runOnboardingWizard(
+      {
+        intent: "models-auth-login",
+        provider: "cliproxy",
+      },
+      runtime,
+      prompter,
+    );
+
+    expect(resolveExistingCustomProviderContext).toHaveBeenCalledWith(expect.any(Object), "cliproxy");
+    expect(promptAuthChoiceGrouped).not.toHaveBeenCalled();
+    expect(promptCustomApiConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialBaseUrl: "http://192.168.0.52:8317/v1",
+        initialModelId: "gpt-5.4",
+        initialProviderId: "cliproxy",
+        initialCompatibility: "openai",
+      }),
+    );
+    expect(finalizeCustomApiConfig).toHaveBeenCalled();
+    expect(applyAuthChoice).not.toHaveBeenCalled();
+    expect(setupChannels).not.toHaveBeenCalled();
+    expect(setupSkills).not.toHaveBeenCalled();
   });
 
   it("resolves gateway.auth.password SecretRef for local onboarding probe", async () => {

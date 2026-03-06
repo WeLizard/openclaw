@@ -87,6 +87,13 @@ export type ApplyCustomApiConfigParams = {
   alias?: string;
 };
 
+export type ExistingCustomProviderContext = {
+  providerId: string;
+  baseUrl: string;
+  modelId: string;
+  compatibility: CustomApiCompatibility;
+};
+
 export type ParseNonInteractiveCustomApiFlagsParams = {
   baseUrl?: string;
   modelId?: string;
@@ -172,6 +179,43 @@ function buildEndpointIdFromUrl(baseUrl: string): string {
   } catch {
     return "custom";
   }
+}
+
+function resolveCustomCompatibilityFromApi(
+  api: ModelProviderConfig["api"],
+): CustomApiCompatibility | null {
+  if (api === "anthropic-messages") {
+    return "anthropic";
+  }
+  if (api === "openai-completions") {
+    return "openai";
+  }
+  return null;
+}
+
+export function resolveExistingCustomProviderContext(
+  config: OpenClawConfig,
+  providerId: string,
+): ExistingCustomProviderContext | null {
+  const normalizedProviderId = normalizeEndpointId(providerId);
+  if (!normalizedProviderId) {
+    return null;
+  }
+  const provider = config.models?.providers?.[normalizedProviderId];
+  if (!provider?.baseUrl || !Array.isArray(provider.models) || provider.models.length === 0) {
+    return null;
+  }
+  const compatibility = resolveCustomCompatibilityFromApi(provider.api);
+  const modelId = provider.models[0]?.id?.trim();
+  if (!compatibility || !modelId) {
+    return null;
+  }
+  return {
+    providerId: normalizedProviderId,
+    baseUrl: provider.baseUrl,
+    modelId,
+    compatibility,
+  };
 }
 
 function resolveUniqueEndpointId(params: {
@@ -443,10 +487,14 @@ async function promptCustomApiRetryChoice(prompter: WizardPrompter): Promise<Cus
   });
 }
 
-async function promptCustomApiModelId(prompter: WizardPrompter): Promise<string> {
+async function promptCustomApiModelId(
+  prompter: WizardPrompter,
+  initialValue?: string,
+): Promise<string> {
   return (
     await prompter.text({
       message: "Model ID",
+      initialValue,
       placeholder: "e.g. llama3, claude-3-7-sonnet",
       validate: (val) => (val.trim() ? undefined : "Model ID is required"),
     })
@@ -731,6 +779,11 @@ export async function promptCustomApiConfig(params: {
   runtime: RuntimeEnv;
   config: OpenClawConfig;
   secretInputMode?: SecretInputMode;
+  initialBaseUrl?: string;
+  initialModelId?: string;
+  initialProviderId?: string;
+  initialCompatibility?: CustomApiCompatibility;
+  initialAlias?: string;
 }): Promise<CustomApiResult> {
   const { prompter, runtime, config } = params;
 
@@ -738,21 +791,23 @@ export async function promptCustomApiConfig(params: {
     prompter,
     config,
     secretInputMode: params.secretInputMode,
+    initialBaseUrl: params.initialBaseUrl,
   });
   let baseUrl = baseInput.baseUrl;
   let apiKey = baseInput.apiKey;
   let resolvedApiKey = baseInput.resolvedApiKey;
 
-  const compatibilityChoice = await prompter.select({
+  const compatibilityChoice = await prompter.select<CustomApiCompatibilityChoice>({
     message: "Endpoint compatibility",
     options: COMPATIBILITY_OPTIONS.map((option) => ({
       value: option.value,
       label: option.label,
       hint: option.hint,
     })),
+    initialValue: params.initialCompatibility ?? "unknown",
   });
 
-  let modelId = await promptCustomApiModelId(prompter);
+  let modelId = await promptCustomApiModelId(prompter, params.initialModelId);
 
   let compatibility: CustomApiCompatibility | null =
     compatibilityChoice === "unknown" ? null : compatibilityChoice;
@@ -831,7 +886,8 @@ export async function promptCustomApiConfig(params: {
   }
 
   const providers = config.models?.providers ?? {};
-  const suggestedId = buildEndpointIdFromUrl(baseUrl);
+  const suggestedId =
+    normalizeEndpointId(params.initialProviderId ?? "") || buildEndpointIdFromUrl(baseUrl);
   const providerIdInput = await prompter.text({
     message: "Endpoint ID",
     initialValue: suggestedId,
@@ -847,7 +903,7 @@ export async function promptCustomApiConfig(params: {
   const aliasInput = await prompter.text({
     message: "Model alias (optional)",
     placeholder: "e.g. local, ollama",
-    initialValue: "",
+    initialValue: params.initialAlias ?? "",
     validate: (value) => {
       const requestedId = normalizeEndpointId(providerIdInput) || "custom";
       const providerIdResult = resolveUniqueEndpointId({

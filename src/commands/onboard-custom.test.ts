@@ -10,6 +10,7 @@ import {
   finalizeCustomApiConfig,
   parseNonInteractiveCustomApiFlags,
   promptCustomApiConfig,
+  resolveExistingCustomProviderContext,
 } from "./onboard-custom.js";
 
 // Mock dependencies
@@ -135,6 +136,39 @@ describe("promptCustomApiConfig", () => {
 
     expectOpenAiCompatResult({ prompter, textCalls: 5, selectCalls: 2, result });
     expect(result.config.agents?.defaults?.models?.["custom/llama3"]?.alias).toBe("local");
+  });
+
+  it("prefills existing custom provider values when supplied", async () => {
+    const prompter = createTestPrompter({
+      text: ["http://192.168.0.52:8317/v1", "", "gpt-5.4", "cliproxy", ""],
+      select: ["plaintext", "openai"],
+    });
+    stubFetchSequence([{ ok: true }]);
+
+    await promptCustomApiConfig({
+      prompter: prompter as unknown as Parameters<typeof promptCustomApiConfig>[0]["prompter"],
+      runtime: { ...defaultRuntime, log: vi.fn() },
+      config: {},
+      initialBaseUrl: "http://192.168.0.52:8317/v1",
+      initialModelId: "gpt-5.4",
+      initialProviderId: "cliproxy",
+      initialCompatibility: "openai",
+    });
+
+    expect(prompter.text).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ message: "API Base URL", initialValue: "http://192.168.0.52:8317/v1" }),
+    );
+    expect(prompter.select).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ message: "Endpoint compatibility", initialValue: "openai" }),
+    );
+    expect(prompter.text).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Model ID", initialValue: "gpt-5.4" }),
+    );
+    expect(prompter.text).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Endpoint ID", initialValue: "cliproxy" }),
+    );
   });
 
   it("finalizes custom provider into auth-profiles and strips inline apiKey", async () => {
@@ -451,6 +485,42 @@ describe("applyCustomApiConfig", () => {
     },
   ])("rejects $name", ({ params, expectedMessage }) => {
     expect(() => applyCustomApiConfig(params)).toThrow(expectedMessage);
+  });
+});
+
+describe("resolveExistingCustomProviderContext", () => {
+  it("detects an existing OpenAI-compatible custom provider", () => {
+    const result = resolveExistingCustomProviderContext(
+      {
+        models: {
+          providers: {
+            cliproxy: {
+              baseUrl: "http://192.168.0.52:8317/v1",
+              api: "openai-completions",
+              models: [
+                {
+                  id: "gpt-5.4",
+                  name: "GPT-5.4",
+                  contextWindow: 200000,
+                  maxTokens: 16384,
+                  input: ["text"],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  reasoning: true,
+                },
+              ],
+            },
+          },
+        },
+      },
+      "cliproxy",
+    );
+
+    expect(result).toEqual({
+      providerId: "cliproxy",
+      baseUrl: "http://192.168.0.52:8317/v1",
+      modelId: "gpt-5.4",
+      compatibility: "openai",
+    });
   });
 });
 
