@@ -3,6 +3,7 @@ import { t } from "../../i18n/index.ts";
 import { icons } from "../icons.ts";
 import type { ConfigUiHints } from "../types.ts";
 import { matchesNodeSearch, parseConfigSearchQuery, renderNode } from "./config-form.node.ts";
+import { resolveConfigFieldTranslation } from "./config-form.i18n.ts";
 import { hintForPath, humanize, schemaType, type JsonSchema } from "./config-form.shared.ts";
 
 export type ConfigFormProps = {
@@ -579,7 +580,11 @@ export function renderConfigForm(props: ConfigFormProps) {
       <div class="config-empty">
         <div class="config-empty__icon">${icons.search}</div>
         <div class="config-empty__text">
-          ${searchQuery ? `No settings match "${searchQuery}"` : "No settings in this section"}
+          ${
+            searchQuery
+              ? t("config.empty.noSettingsMatch", { query: searchQuery })
+              : t("config.empty.noSettingsInSection")
+          }
         </div>
       </div>
     `;
@@ -592,8 +597,16 @@ export function renderConfigForm(props: ConfigFormProps) {
           ? (() => {
               const { sectionKey, subsectionKey, schema: node } = subsectionContext;
               const hint = hintForPath([sectionKey, subsectionKey], props.uiHints);
-              const label = hint?.label ?? node.title ?? humanize(subsectionKey);
-              const description = hint?.help ?? node.description ?? "";
+              const label =
+                resolveConfigFieldTranslation([sectionKey, subsectionKey], "label") ??
+                hint?.label ??
+                node.title ??
+                humanize(subsectionKey);
+              const description =
+                resolveConfigFieldTranslation([sectionKey, subsectionKey], "help") ??
+                hint?.help ??
+                node.description ??
+                "";
               const sectionValue = value[sectionKey];
               const scopedValue =
                 sectionValue && typeof sectionValue === "object"
