@@ -17,7 +17,11 @@ import {
   redactConfigSnapshot,
   restoreRedactedValues,
 } from "../../config/redact-snapshot.js";
-import { buildConfigSchema, type ConfigSchemaResponse } from "../../config/schema.js";
+import {
+  buildConfigSchema,
+  type ChannelUiMetadata,
+  type ConfigSchemaResponse,
+} from "../../config/schema.js";
 import { extractDeliveryInfo } from "../../config/sessions.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
@@ -27,6 +31,7 @@ import {
 } from "../../infra/restart-sentinel.js";
 import { scheduleGatewaySigusr1Restart } from "../../infra/restart.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
+import type { PluginRegistry } from "../../plugins/registry.js";
 import { diffConfigPaths } from "../config-reload.js";
 import {
   formatControlPlaneActor,
@@ -46,6 +51,59 @@ import { resolveBaseHashParam } from "./base-hash.js";
 import { parseRestartRequestParams } from "./restart-request.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
+
+type ChannelSchemaSource = {
+  id: string;
+  meta?: {
+    label?: string;
+    blurb?: string;
+  };
+  configSchema?: {
+    schema: Record<string, unknown>;
+    uiHints?: Record<string, unknown>;
+  };
+};
+
+function mergeChannelMetadata(
+  current: ChannelUiMetadata | undefined,
+  source: ChannelSchemaSource,
+): ChannelUiMetadata {
+  return {
+    id: source.id,
+    label: source.meta?.label?.trim() || current?.label,
+    description: source.meta?.blurb?.trim() || current?.description,
+    configSchema:
+      (source.configSchema?.schema as Record<string, unknown> | undefined) ?? current?.configSchema,
+    configUiHints:
+      (source.configSchema?.uiHints as ChannelUiMetadata["configUiHints"] | undefined) ??
+      current?.configUiHints,
+  };
+}
+
+export function collectChannelUiMetadata(params: {
+  pluginRegistry: PluginRegistry;
+  runtimeChannels?: ChannelSchemaSource[];
+}): ChannelUiMetadata[] {
+  const merged = new Map<string, ChannelUiMetadata>();
+
+  for (const entry of params.pluginRegistry.channels) {
+    const id = entry.plugin.id.trim();
+    if (!id) {
+      continue;
+    }
+    merged.set(id, mergeChannelMetadata(merged.get(id), entry.plugin));
+  }
+
+  for (const channel of params.runtimeChannels ?? []) {
+    const id = channel.id.trim();
+    if (!id) {
+      continue;
+    }
+    merged.set(id, mergeChannelMetadata(merged.get(id), channel));
+  }
+
+  return Array.from(merged.values());
+}
 
 function requireConfigBaseHash(
   params: unknown,
@@ -233,13 +291,17 @@ function loadSchemaWithPlugins(): ConfigSchemaResponse {
       configUiHints: plugin.configUiHints,
       configSchema: plugin.configJsonSchema,
     })),
-    channels: listChannelPlugins().map((entry) => ({
-      id: entry.id,
-      label: entry.meta.label,
-      description: entry.meta.blurb,
-      configSchema: entry.configSchema?.schema,
-      configUiHints: entry.configSchema?.uiHints,
-    })),
+    channels: collectChannelUiMetadata({
+      pluginRegistry,
+      runtimeChannels: listChannelPlugins().map((entry) => ({
+        id: entry.id,
+        meta: {
+          label: entry.meta.label,
+          blurb: entry.meta.blurb,
+        },
+        configSchema: entry.configSchema,
+      })),
+    }),
   });
 }
 
