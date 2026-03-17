@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createWizardPrompter as buildWizardPrompter } from "../../test/helpers/wizard-prompter.js";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../agents/workspace.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { runOnboardingWizard } from "./onboarding.js";
+import { runOnboardingWizard } from "./setup.js";
 import type { WizardPrompter, WizardSelectParams } from "./prompts.js";
 
 const ensureAuthProfileStore = vi.hoisted(() => vi.fn(() => ({ profiles: {} })));
@@ -71,6 +71,22 @@ const setupChannels = vi.hoisted(() => vi.fn(async (cfg) => cfg));
 const setupSkills = vi.hoisted(() => vi.fn(async (cfg) => cfg));
 const healthCommand = vi.hoisted(() => vi.fn(async () => {}));
 const ensureWorkspaceAndSessions = vi.hoisted(() => vi.fn(async () => {}));
+const applyLocalSetupWorkspaceConfig = vi.hoisted(() =>
+  vi.fn((baseConfig, workspaceDir: string) => ({
+    ...baseConfig,
+    agents: {
+      ...baseConfig?.agents,
+      defaults: {
+        ...baseConfig?.agents?.defaults,
+        workspace: workspaceDir,
+      },
+    },
+    gateway: {
+      ...baseConfig?.gateway,
+      mode: "local",
+    },
+  })),
+);
 const writeConfigFile = vi.hoisted(() => vi.fn(async () => {}));
 const readConfigFileSnapshot = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -166,6 +182,10 @@ vi.mock("../commands/onboard-helpers.js", () => ({
   })),
 }));
 
+vi.mock("../commands/onboard-config.js", () => ({
+  applyLocalSetupWorkspaceConfig,
+}));
+
 vi.mock("../commands/systemd-linger.js", () => ({
   ensureSystemdUserLingerInteractive,
 }));
@@ -190,16 +210,16 @@ vi.mock("../tui/tui.js", () => ({
   runTui,
 }));
 
-vi.mock("./onboarding.gateway-config.js", () => ({
-  configureGatewayForOnboarding,
+vi.mock("./setup.gateway-config.js", () => ({
+  configureGatewayForSetup: configureGatewayForOnboarding,
 }));
 
-vi.mock("./onboarding.finalize.js", () => ({
-  finalizeOnboardingWizard,
+vi.mock("./setup.finalize.js", () => ({
+  finalizeSetupWizard: finalizeOnboardingWizard,
 }));
 
-vi.mock("./onboarding.completion.js", () => ({
-  setupOnboardingShellCompletion,
+vi.mock("./setup.completion.js", () => ({
+  setupWizardShellCompletion: setupOnboardingShellCompletion,
 }));
 
 function createRuntime(opts?: { throwsOnExit?: boolean }): RuntimeEnv {
