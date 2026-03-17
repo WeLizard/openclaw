@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as bootstrapCache from "../../agents/bootstrap-cache.js";
 import { buildModelAliasIndex } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -850,11 +851,18 @@ describe("initSessionState RawBody", () => {
 });
 
 describe("initSessionState reset policy", () => {
+  let clearBootstrapSnapshotOnSessionRolloverSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.useFakeTimers();
+    clearBootstrapSnapshotOnSessionRolloverSpy = vi.spyOn(
+      bootstrapCache,
+      "clearBootstrapSnapshotOnSessionRollover",
+    );
   });
 
   afterEach(() => {
+    clearBootstrapSnapshotOnSessionRolloverSpy.mockRestore();
     vi.useRealTimers();
   });
 
@@ -881,6 +889,10 @@ describe("initSessionState reset policy", () => {
 
     expect(result.isNewSession).toBe(true);
     expect(result.sessionId).not.toBe(existingSessionId);
+    expect(clearBootstrapSnapshotOnSessionRolloverSpy).toHaveBeenCalledWith({
+      sessionKey,
+      previousSessionId: existingSessionId,
+    });
   });
 
   it("treats sessions as stale before the daily reset when updated before yesterday's boundary", async () => {
@@ -1057,6 +1069,10 @@ describe("initSessionState reset policy", () => {
 
     expect(result.isNewSession).toBe(false);
     expect(result.sessionId).toBe(existingSessionId);
+    expect(clearBootstrapSnapshotOnSessionRolloverSpy).toHaveBeenCalledWith({
+      sessionKey,
+      previousSessionId: undefined,
+    });
   });
 });
 
@@ -1926,8 +1942,11 @@ describe("initSessionState internal channel routing preservation", () => {
     expect(result.sessionEntry.deliveryContext?.to).toBe("group:12345");
   });
 
-  it("lets direct webchat turns override persisted external routes for per-channel-peer sessions", async () => {
-    const storePath = await createStorePath("webchat-direct-route-override-");
+  it("preserves persisted external route when webchat views a channel-peer session (fixes #47745)", async () => {
+    // Regression: dashboard/webchat access must not overwrite an established
+    // external delivery route (e.g. Telegram/iMessage) on a channel-scoped session.
+    // Subagent completions should still be delivered to the original channel.
+    const storePath = await createStorePath("webchat-direct-route-preserve-");
     const sessionKey = "agent:main:imessage:direct:+1555";
     await writeSessionStoreFast(storePath, {
       [sessionKey]: {
@@ -1939,6 +1958,40 @@ describe("initSessionState internal channel routing preservation", () => {
           channel: "imessage",
           to: "+1555",
         },
+      },
+    });
+    const cfg = {
+      session: { store: storePath, dmScope: "per-channel-peer" },
+    } as OpenClawConfig;
+
+    const result = await initSessionState({
+      ctx: {
+        Body: "reply from control ui",
+        SessionKey: sessionKey,
+        OriginatingChannel: "webchat",
+        OriginatingTo: "session:dashboard",
+        Surface: "webchat",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    // External route must be preserved — webchat is admin/monitoring only
+    expect(result.sessionEntry.lastChannel).toBe("imessage");
+    expect(result.sessionEntry.lastTo).toBe("+1555");
+    expect(result.sessionEntry.deliveryContext?.channel).toBe("imessage");
+    expect(result.sessionEntry.deliveryContext?.to).toBe("+1555");
+  });
+
+  it("lets direct webchat turns own routing for sessions with no prior external route", async () => {
+    // Webchat should still own routing for sessions that were created via webchat
+    // (no external channel ever established).
+    const storePath = await createStorePath("webchat-direct-route-noext-");
+    const sessionKey = "agent:main:main";
+    await writeSessionStoreFast(storePath, {
+      [sessionKey]: {
+        sessionId: "sess-webchat-noext",
+        updatedAt: Date.now(),
       },
     });
     const cfg = {
@@ -2052,8 +2105,10 @@ describe("initSessionState internal channel routing preservation", () => {
     expect(result.sessionEntry.lastChannel).toBe("webchat");
   });
 
-  it("does not reuse stale external lastTo for webchat/main turns without destination", async () => {
-    const storePath = await createStorePath("webchat-main-no-stale-lastto-");
+  it("preserves external route for main session when webchat accesses without destination (fixes #47745)", async () => {
+    // Regression: webchat monitoring a main session that has an established WhatsApp
+    // route must not clear that route. Subagents should still deliver to WhatsApp.
+    const storePath = await createStorePath("webchat-main-preserve-external-");
     const sessionKey = "agent:main:main";
     await writeSessionStoreFast(storePath, {
       [sessionKey]: {
@@ -2079,12 +2134,14 @@ describe("initSessionState internal channel routing preservation", () => {
       commandAuthorized: true,
     });
 
-    expect(result.sessionEntry.lastChannel).toBe("webchat");
-    expect(result.sessionEntry.lastTo).toBeUndefined();
+    expect(result.sessionEntry.lastChannel).toBe("whatsapp");
+    expect(result.sessionEntry.lastTo).toBe("+15555550123");
   });
 
-  it("prefers webchat route over persisted external route for main session turns", async () => {
-    const storePath = await createStorePath("prefer-webchat-main-route-");
+  it("preserves external route for main session when webchat sends with destination (fixes #47745)", async () => {
+    // Regression: webchat sending to a main session with an established WhatsApp route
+    // must not steal that route for webchat delivery.
+    const storePath = await createStorePath("preserve-main-external-webchat-send-");
     const sessionKey = "agent:main:main";
     await writeSessionStoreFast(storePath, {
       [sessionKey]: {
@@ -2111,9 +2168,9 @@ describe("initSessionState internal channel routing preservation", () => {
       commandAuthorized: true,
     });
 
-    expect(result.sessionEntry.lastChannel).toBe("webchat");
-    expect(result.sessionEntry.lastTo).toBe("session:webchat-main");
-    expect(result.sessionEntry.deliveryContext?.channel).toBe("webchat");
-    expect(result.sessionEntry.deliveryContext?.to).toBe("session:webchat-main");
+    expect(result.sessionEntry.lastChannel).toBe("whatsapp");
+    expect(result.sessionEntry.lastTo).toBe("+15555550123");
+    expect(result.sessionEntry.deliveryContext?.channel).toBe("whatsapp");
+    expect(result.sessionEntry.deliveryContext?.to).toBe("+15555550123");
   });
 });

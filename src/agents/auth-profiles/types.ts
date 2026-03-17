@@ -40,6 +40,7 @@ export type AuthProfileFailureReason =
   | "auth"
   | "auth_permanent"
   | "format"
+  | "overloaded"
   | "rate_limit"
   | "billing"
   | "timeout"

@@ -6,7 +6,9 @@ import { captureEnv } from "../../test-utils/env.js";
 import {
   clearRuntimeAuthProfileStoreSnapshots,
   deleteAuthProfile,
+  ensureAuthProfileStore,
   resolveAuthProfileOrder,
+  replaceRuntimeAuthProfileStoreSnapshots,
   saveAuthProfileStore,
   setAuthProfileManualDisabled,
   type AuthProfileStore,
@@ -129,5 +131,114 @@ describe("auth profile management", () => {
     expect(updated?.order?.[provider]).toEqual([a2]);
     expect(updated?.lastGood?.[provider]).toBeUndefined();
     expect(updated?.usageStats?.[a1]).toBeUndefined();
+  });
+
+  it("returns null when manual disable would be a no-op", async () => {
+    const provider = "cliproxy";
+    const profileId = `${provider}:default`;
+    const store: AuthProfileStore = {
+      version: 1,
+      profiles: {
+        [profileId]: {
+          type: "api_key",
+          provider,
+          key: "cliproxy-key",
+        },
+      },
+    };
+    saveAuthProfileStore(store, mainAgentDir);
+
+    const firstDisable = await setAuthProfileManualDisabled({
+      agentDir: mainAgentDir,
+      profileId,
+      disabled: true,
+    });
+    expect(firstDisable?.usageStats?.[profileId]?.disabledReason).toBe("manual");
+
+    const secondDisable = await setAuthProfileManualDisabled({
+      agentDir: mainAgentDir,
+      profileId,
+      disabled: true,
+    });
+    expect(secondDisable).toBeNull();
+  });
+
+  it("syncs runtime snapshot after manual disable", async () => {
+    const provider = "cliproxy";
+    const profileId = `${provider}:default`;
+    const store: AuthProfileStore = {
+      version: 1,
+      profiles: {
+        [profileId]: {
+          type: "api_key",
+          provider,
+          key: "cliproxy-key",
+        },
+      },
+    };
+    saveAuthProfileStore(store, mainAgentDir);
+    replaceRuntimeAuthProfileStoreSnapshots([{ agentDir: mainAgentDir, store }]);
+
+    const updated = await setAuthProfileManualDisabled({
+      agentDir: mainAgentDir,
+      profileId,
+      disabled: true,
+    });
+
+    expect(updated?.usageStats?.[profileId]?.disabledReason).toBe("manual");
+    expect(updated?.usageStats?.[profileId]?.disabledUntil).toBeGreaterThan(Date.now());
+
+    const runtimeStore = ensureAuthProfileStore(mainAgentDir);
+    expect(runtimeStore.usageStats?.[profileId]?.disabledReason).toBe("manual");
+
+    const onDisk = JSON.parse(
+      await fs.readFile(path.join(mainAgentDir, "auth-profiles.json"), "utf8"),
+    ) as AuthProfileStore;
+    expect(onDisk.usageStats?.[profileId]?.disabledReason).toBe("manual");
+  });
+
+  it("syncs runtime snapshot after profile delete", async () => {
+    const provider = "cliproxy";
+    const profileId = `${provider}:default`;
+    const store: AuthProfileStore = {
+      version: 1,
+      profiles: {
+        [profileId]: {
+          type: "api_key",
+          provider,
+          key: "cliproxy-key",
+        },
+      },
+      order: { [provider]: [profileId] },
+      lastGood: { [provider]: profileId },
+      usageStats: {
+        [profileId]: {
+          disabledReason: "manual",
+          disabledUntil: Date.now() + 60_000,
+        },
+      },
+    };
+    saveAuthProfileStore(store, mainAgentDir);
+    replaceRuntimeAuthProfileStoreSnapshots([{ agentDir: mainAgentDir, store }]);
+
+    const updated = await deleteAuthProfile({
+      agentDir: mainAgentDir,
+      profileId,
+    });
+
+    expect(updated?.profiles[profileId]).toBeUndefined();
+    expect(updated?.order?.[provider]).toBeUndefined();
+    expect(updated?.lastGood?.[provider]).toBeUndefined();
+    expect(updated?.usageStats?.[profileId]).toBeUndefined();
+
+    const runtimeStore = ensureAuthProfileStore(mainAgentDir);
+    expect(runtimeStore.profiles[profileId]).toBeUndefined();
+    expect(runtimeStore.usageStats?.[profileId]).toBeUndefined();
+
+    const onDisk = JSON.parse(
+      await fs.readFile(path.join(mainAgentDir, "auth-profiles.json"), "utf8"),
+    ) as AuthProfileStore;
+    expect(onDisk.profiles[profileId]).toBeUndefined();
+    expect(onDisk.usageStats?.[profileId]).toBeUndefined();
   });
 });
