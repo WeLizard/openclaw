@@ -102,7 +102,7 @@ describe("loadSettings default gateway URL derivation", () => {
     expect(loadSettings().gatewayUrl).toBe(expectedGatewayUrl("/apps/openclaw"));
   });
 
-  it("ignores and scrubs legacy persisted tokens", async () => {
+  it("migrates a legacy persisted token into sessionStorage and scrubs localStorage", async () => {
     setTestLocation({
       protocol: "https:",
       host: "gateway.example:8443",
@@ -121,9 +121,12 @@ describe("loadSettings default gateway URL derivation", () => {
     const { loadSettings } = await import("./storage.ts");
     expect(loadSettings()).toMatchObject({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "",
+      token: "persisted-token",
       sessionKey: "agent",
     });
+    expect(sessionStorage.getItem("openclaw.control.token.v1:wss://gateway.example:8443/openclaw")).toBe(
+      "persisted-token",
+    );
     expect(JSON.parse(localStorage.getItem("openclaw.control.settings.v1") ?? "{}")).toEqual({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
       theme: "claw",
@@ -142,7 +145,7 @@ describe("loadSettings default gateway URL derivation", () => {
         },
       },
     });
-    expect(sessionStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(1);
   });
 
   it("loads the current-tab token from sessionStorage", async () => {
@@ -173,6 +176,123 @@ describe("loadSettings default gateway URL derivation", () => {
       gatewayUrl: "wss://gateway.example:8443/openclaw",
       token: "session-token",
     });
+  });
+
+  it("migrates a legacy persisted token even when scoped settings already exist", async () => {
+    setTestLocation({
+      protocol: "https:",
+      host: "gateway.example:8443",
+      pathname: "/",
+    });
+
+    localStorage.setItem(
+      "openclaw.control.settings.v1",
+      JSON.stringify({
+        gatewayUrl: "wss://gateway.example:8443/openclaw",
+        token: "legacy-token",
+        sessionKey: "main",
+        lastActiveSessionKey: "main",
+        theme: "claw",
+        themeMode: "system",
+        chatFocusMode: false,
+        chatShowThinking: true,
+        chatShowToolCalls: true,
+        splitRatio: 0.6,
+        navCollapsed: false,
+        navWidth: 220,
+        navGroupsCollapsed: {},
+      }),
+    );
+    localStorage.setItem(
+      "openclaw.control.settings.v1:wss://gateway.example:8443/openclaw",
+      JSON.stringify({
+        gatewayUrl: "wss://gateway.example:8443/openclaw",
+        theme: "claw",
+        themeMode: "dark",
+        chatFocusMode: false,
+        chatShowThinking: true,
+        chatShowToolCalls: true,
+        splitRatio: 0.6,
+        navCollapsed: false,
+        navWidth: 220,
+        navGroupsCollapsed: {},
+        sessionsByGateway: {
+          "wss://gateway.example:8443/openclaw": {
+            sessionKey: "agent:main:main",
+            lastActiveSessionKey: "agent:main:main",
+          },
+        },
+        locale: "ru",
+      }),
+    );
+
+    const { loadSettings } = await import("./storage.ts");
+    expect(loadSettings()).toMatchObject({
+      gatewayUrl: "wss://gateway.example:8443/openclaw",
+      token: "legacy-token",
+      sessionKey: "agent:main:main",
+      lastActiveSessionKey: "agent:main:main",
+      locale: "ru",
+    });
+    expect(sessionStorage.getItem("openclaw.control.token.v1:wss://gateway.example:8443/openclaw")).toBe(
+      "legacy-token",
+    );
+    expect(
+      JSON.parse(
+        localStorage.getItem("openclaw.control.settings.v1:wss://gateway.example:8443/openclaw") ??
+          "{}",
+      ),
+    ).toMatchObject({
+      gatewayUrl: "wss://gateway.example:8443/openclaw",
+      themeMode: "dark",
+      locale: "ru",
+      sessionsByGateway: {
+        "wss://gateway.example:8443/openclaw": {
+          sessionKey: "agent:main:main",
+          lastActiveSessionKey: "agent:main:main",
+        },
+      },
+    });
+  });
+
+  it("follows the persisted gateway pointer when legacy settings target another gateway", async () => {
+    setTestLocation({
+      protocol: "https:",
+      host: "gateway.example:8443",
+      pathname: "/",
+    });
+
+    localStorage.setItem(
+      "openclaw.control.settings.v1",
+      JSON.stringify({
+        gatewayUrl: "wss://other-gateway.example:8443/openclaw",
+        token: "legacy-token",
+      }),
+    );
+    localStorage.setItem(
+      "openclaw.control.settings.v1:wss://gateway.example:8443/openclaw",
+      JSON.stringify({
+        gatewayUrl: "wss://gateway.example:8443/openclaw",
+        theme: "claw",
+        themeMode: "dark",
+        chatFocusMode: false,
+        chatShowThinking: true,
+        chatShowToolCalls: true,
+        splitRatio: 0.6,
+        navCollapsed: false,
+        navWidth: 220,
+        navGroupsCollapsed: {},
+      }),
+    );
+
+    const { loadSettings } = await import("./storage.ts");
+    expect(loadSettings()).toMatchObject({
+      gatewayUrl: "wss://other-gateway.example:8443/openclaw",
+      token: "legacy-token",
+    });
+    expect(
+      sessionStorage.getItem("openclaw.control.token.v1:wss://other-gateway.example:8443/openclaw"),
+    ).toBe("legacy-token");
   });
 
   it("does not reuse a session token for a different gatewayUrl", async () => {
