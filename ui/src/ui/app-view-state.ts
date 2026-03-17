@@ -1,10 +1,10 @@
 import type { EventLogEntry } from "./app-events.ts";
 import type { CompactionStatus, FallbackStatus } from "./app-tool-stream.ts";
-import type { ModelCatalogState } from "./controllers/model-catalog.ts";
 import type { CronModelSuggestionsState, CronState } from "./controllers/cron.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import type { ModelCatalogState } from "./controllers/model-catalog.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
@@ -163,6 +163,7 @@ export type AppViewState = {
   modelAuthBusyKey: string | null;
   modelAuthError: string | null;
   modelAuthStatus: ModelsAuthStatusResult | null;
+  modelAuthDeleteConfirmProfileId: string | null;
   wizardOpen: boolean;
   wizardLoading: boolean;
   wizardBusy: boolean;

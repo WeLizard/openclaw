@@ -53,7 +53,6 @@ import {
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
-import { modelCatalogEntryRef, resolveModelRef } from "./model-utils.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { deleteSessionAndRefresh, loadSessions, patchSession } from "./controllers/sessions.ts";
@@ -66,6 +65,7 @@ import {
 } from "./controllers/skills.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
+import { modelCatalogEntryRef, resolveModelRef } from "./model-utils.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import { resolveConfiguredCronModelSuggestions, sortLocaleStrings } from "./views/agents-utils.ts";
 import { renderAgents } from "./views/agents.ts";
@@ -350,6 +350,7 @@ export function renderApp(state: AppViewState) {
                 modelAuthBusyKey: state.modelAuthBusyKey,
                 modelAuthError: state.modelAuthError,
                 modelAuthStatus: state.modelAuthStatus,
+                modelAuthDeleteConfirmProfileId: state.modelAuthDeleteConfirmProfileId,
                 wizardOpen: state.wizardOpen,
                 wizardLoading: state.wizardLoading,
                 wizardBusy: state.wizardBusy,
@@ -371,16 +372,16 @@ export function renderApp(state: AppViewState) {
                 onModelAuthRefresh: () => void state.handleLoadModelAuthStatus(),
                 onPromoteProfile: (provider, profileId) =>
                   void state.handlePromoteModelAuthProfile(provider, profileId),
-                onClearProviderOrder: (provider) =>
-                  void state.handleClearModelAuthOrder(provider),
+                onClearProviderOrder: (provider) => void state.handleClearModelAuthOrder(provider),
                 onClearProfileCooldown: (profileId) =>
                   void state.handleClearModelAuthCooldown(profileId),
                 onDisableProfile: (profileId) =>
                   void state.handleDisableModelAuthProfile(profileId),
-                onEnableProfile: (profileId) =>
-                  void state.handleEnableModelAuthProfile(profileId),
-                onDeleteProfile: (profileId) =>
-                  void state.handleDeleteModelAuthProfile(profileId),
+                onEnableProfile: (profileId) => void state.handleEnableModelAuthProfile(profileId),
+                onRequestDeleteProfile: (profileId) =>
+                  state.requestDeleteModelAuthProfile(profileId),
+                onCancelDeleteProfile: () => state.cancelDeleteModelAuthProfile(),
+                onDeleteProfile: (profileId) => void state.handleDeleteModelAuthProfile(profileId),
                 onStartProviderAuth: (provider) => void state.handleStartProviderAuth(provider),
                 onStartWizard: (mode) => void state.handleStartSetupWizard(mode),
               })
@@ -462,9 +463,9 @@ export function renderApp(state: AppViewState) {
                   new Set(
                     [
                       ...(state.availableModels ?? []).map((entry) => modelCatalogEntryRef(entry)),
-                      ...((state.sessionsResult?.sessions ?? []).map((row) =>
+                      ...(state.sessionsResult?.sessions ?? []).map((row) =>
                         resolveModelRef(row.modelProvider, row.model),
-                      )),
+                      ),
                     ].filter(Boolean),
                   ),
                 ).toSorted((a, b) => a.localeCompare(b)),

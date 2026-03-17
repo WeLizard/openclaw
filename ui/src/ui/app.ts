@@ -58,13 +58,6 @@ import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
 import {
-  cancelSetupWizard as cancelSetupWizardInternal,
-  dismissSetupWizard as dismissSetupWizardInternal,
-  startSetupWizard as startSetupWizardInternal,
-  submitSetupWizard as submitSetupWizardInternal,
-  updateSetupWizardDraft as updateSetupWizardDraftInternal,
-} from "./controllers/setup-wizard.ts";
-import {
   clearModelAuthCooldown as clearModelAuthCooldownInternal,
   clearModelAuthOrder as clearModelAuthOrderInternal,
   deleteModelAuthProfile as deleteModelAuthProfileInternal,
@@ -74,6 +67,13 @@ import {
   promoteModelAuthProfile as promoteModelAuthProfileInternal,
 } from "./controllers/model-auth.ts";
 import { loadAvailableModels as loadAvailableModelsInternal } from "./controllers/model-catalog.ts";
+import {
+  cancelSetupWizard as cancelSetupWizardInternal,
+  dismissSetupWizard as dismissSetupWizardInternal,
+  startSetupWizard as startSetupWizardInternal,
+  submitSetupWizard as submitSetupWizardInternal,
+  updateSetupWizardDraft as updateSetupWizardDraftInternal,
+} from "./controllers/setup-wizard.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
@@ -274,6 +274,7 @@ export class OpenClawApp extends LitElement {
   @state() modelAuthBusyKey: string | null = null;
   @state() modelAuthError: string | null = null;
   @state() modelAuthStatus: ModelsAuthStatusResult | null = null;
+  @state() modelAuthDeleteConfirmProfileId: string | null = null;
   @state() wizardOpen = false;
   @state() wizardLoading = false;
   @state() wizardBusy = false;
@@ -544,8 +545,23 @@ export class OpenClawApp extends LitElement {
     await enableModelAuthProfileInternal(this, profileId);
   }
 
+  requestDeleteModelAuthProfile(profileId: string) {
+    this.modelAuthDeleteConfirmProfileId =
+      this.modelAuthDeleteConfirmProfileId === profileId ? null : profileId;
+  }
+
+  cancelDeleteModelAuthProfile() {
+    this.modelAuthDeleteConfirmProfileId = null;
+  }
+
   async handleDeleteModelAuthProfile(profileId: string) {
-    await deleteModelAuthProfileInternal(this, profileId);
+    try {
+      await deleteModelAuthProfileInternal(this, profileId);
+    } finally {
+      if (this.modelAuthDeleteConfirmProfileId === profileId) {
+        this.modelAuthDeleteConfirmProfileId = null;
+      }
+    }
   }
 
   async handleStartSetupWizard(mode: "local" | "remote") {

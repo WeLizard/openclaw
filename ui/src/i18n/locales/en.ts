@@ -117,7 +117,8 @@ export const en: TranslationMap = {
     },
     accounts: {
       title: "Accounts",
-      subtitle: "See which provider profile is active and quickly move a healthy account to the front.",
+      subtitle:
+        "See which provider profile is active and quickly move a healthy account to the front.",
       refreshing: "Refreshing...",
       addProvider: "Add provider",
       addProviderHint:
@@ -150,8 +151,11 @@ export const en: TranslationMap = {
       disableFromPool: "Disable in pool",
       enableInPool: "Enable in pool",
       deleteProfile: "Delete profile",
+      deleteProfileConfirm: "Confirm delete",
       deleteConfirm: "Delete profile {profileId}? This cannot be undone.",
       resetOrder: "Reset order",
+      resetOrderDisabled: "There is no stored custom order to reset.",
+      makePrimaryDisabledCurrent: "This profile is already the active primary profile.",
       typeOauth: "OAuth",
       typeToken: "Token",
       typeApiKey: "API key",
@@ -282,7 +286,7 @@ export const en: TranslationMap = {
     displayName: "Display Name",
     about: "About",
     nip05: "NIP-05",
-    noProfile: "No profile set. Click \"Edit Profile\" to add your name, bio, and avatar.",
+    noProfile: 'No profile set. Click "Edit Profile" to add your name, bio, and avatar.',
     nostrForm: {
       profilePicturePreview: "Profile picture preview",
       accountLabel: "Account: {accountId}",
@@ -342,7 +346,8 @@ export const en: TranslationMap = {
     updating: "Updating...",
     viewPendingChanges: "View {count} pending changes",
     loadingSchema: "Loading schema...",
-    formUnsafeWarning: "Form view can't safely edit some fields. Use Raw to avoid losing config entries.",
+    formUnsafeWarning:
+      "Form view can't safely edit some fields. Use Raw to avoid losing config entries.",
     rawJson5: "Raw JSON5",
     schemaUnavailableUseRaw: "Schema unavailable. Use Raw.",
     empty: {
@@ -350,20 +355,32 @@ export const en: TranslationMap = {
       noSettingsInSection: "No settings in this section",
     },
     sectionMeta: {
-      env: { label: "Environment", description: "Environment variables passed to the gateway process." },
+      env: {
+        label: "Environment",
+        description: "Environment variables passed to the gateway process.",
+      },
       update: { label: "Updates", description: "Auto-update settings and release channel." },
       agents: { label: "Agents", description: "Agent configurations, models, and identities." },
       auth: { label: "Authentication", description: "API keys and authentication profiles." },
-      channels: { label: "Channels", description: "Messaging channels like Telegram, Discord, Slack, and others." },
+      channels: {
+        label: "Channels",
+        description: "Messaging channels like Telegram, Discord, Slack, and others.",
+      },
       messages: { label: "Messages", description: "Message handling and routing settings." },
       commands: { label: "Commands", description: "Custom slash commands." },
       hooks: { label: "Hooks", description: "Webhooks and event hooks." },
       skills: { label: "Skills", description: "Skill packs and capabilities." },
       tools: { label: "Tools", description: "Tool configurations such as browser and search." },
-      gateway: { label: "Gateway", description: "Gateway server settings like port, auth, and binding." },
+      gateway: {
+        label: "Gateway",
+        description: "Gateway server settings like port, auth, and binding.",
+      },
       wizard: { label: "Setup Wizard", description: "Setup wizard state and history." },
       meta: { label: "Metadata", description: "Gateway metadata and version information." },
-      diagnostics: { label: "Diagnostics", description: "Health checks, probes, and support diagnostics." },
+      diagnostics: {
+        label: "Diagnostics",
+        description: "Health checks, probes, and support diagnostics.",
+      },
       logging: { label: "Logging", description: "Log levels and output configuration." },
       cli: { label: "CLI", description: "CLI behavior and command defaults." },
       browser: { label: "Browser", description: "Browser automation settings." },
@@ -373,14 +390,20 @@ export const en: TranslationMap = {
       broadcast: { label: "Broadcast", description: "Broadcast and notification settings." },
       audio: { label: "Audio", description: "Audio input and output settings." },
       media: { label: "Media", description: "Media handling, storage, and delivery settings." },
-      approvals: { label: "Approvals", description: "Approval prompts, policies, and safety defaults." },
+      approvals: {
+        label: "Approvals",
+        description: "Approval prompts, policies, and safety defaults.",
+      },
       session: { label: "Session", description: "Session management and persistence." },
       cron: { label: "Cron", description: "Scheduled tasks and automation." },
       web: { label: "Web", description: "Web server and API settings." },
       discovery: { label: "Discovery", description: "Service discovery and networking." },
       secrets: { label: "Secrets", description: "Secret storage and secret resolution settings." },
       acp: { label: "ACP", description: "Agent control plane settings and approvals." },
-      nodeHost: { label: "Node Host", description: "Node hosting, pairing, and remote execution settings." },
+      nodeHost: {
+        label: "Node Host",
+        description: "Node hosting, pairing, and remote execution settings.",
+      },
       canvasHost: { label: "Canvas Host", description: "Canvas rendering and display." },
       talk: { label: "Talk", description: "Voice and speech settings." },
       memory: { label: "Memory", description: "Memory indexing, retrieval, and storage settings." },
@@ -742,7 +765,8 @@ export const en: TranslationMap = {
     loading: "Loading…",
     empty: "No agents found.",
     selectTitle: "Select an agent",
-    selectSubtitle: "Choose an agent from the sidebar to inspect its workspace, model, tools, and files.",
+    selectSubtitle:
+      "Choose an agent from the sidebar to inspect its workspace, model, tools, and files.",
     headerSubtitle: "Identity and workspace configuration.",
     defaultWorkspace: "default workspace",
     unavailable: "Unavailable",
@@ -986,8 +1010,7 @@ export const en: TranslationMap = {
   gatewayUrlConfirm: {
     title: "Change Gateway URL",
     subtitle: "This will reconnect to a different gateway server.",
-    warning:
-      "Only confirm if you trust this URL. Malicious URLs can compromise your system.",
+    warning: "Only confirm if you trust this URL. Malicious URLs can compromise your system.",
     confirm: "Confirm",
   },
   markdownSidebar: {
@@ -1017,8 +1040,7 @@ export const en: TranslationMap = {
       warnings: "{count} warnings",
       noCritical: "No critical issues",
       info: "info",
-      audit:
-        "Security audit: {summary}. Run openclaw security audit --deep for details.",
+      audit: "Security audit: {summary}. Run openclaw security audit --deep for details.",
     },
   },
   usage: {
@@ -1048,7 +1070,8 @@ export const en: TranslationMap = {
     timeZone: "Time zone",
     localTime: "Local",
     utcTime: "UTC",
-    queryPlaceholder: "Filter sessions (e.g. key:agent:main:cron* model:gpt-4o has:errors minTokens:2000)",
+    queryPlaceholder:
+      "Filter sessions (e.g. key:agent:main:cron* model:gpt-4o has:errors minTokens:2000)",
     filterClientSide: "Filter (client-side)",
     filterAgent: "Agent",
     filterChannel: "Channel",
@@ -1221,7 +1244,8 @@ export const en: TranslationMap = {
     modeModelAuth: "Auth setup for {provider}",
     loading: "Starting wizard...",
     waiting: "Waiting for the next step...",
-    doneMessage: "The wizard finished. Close this dialog and refresh the page if you want to review the new state.",
+    doneMessage:
+      "The wizard finished. Close this dialog and refresh the page if you want to review the new state.",
     cancelledMessage: "The wizard was cancelled.",
     errorMessage: "The wizard stopped with an error.",
     submit: "Submit",
@@ -1456,7 +1480,8 @@ export const en: TranslationMap = {
       failureAlertModeWebhook: "Webhook (HTTP POST)",
       failureAlertAccountId: "Alert account ID",
       failureAlertAccountIdPlaceholder: "Account ID for multi-account setups",
-      failureAlertAccountIdHelp: "Use a specific account when failure alerts should not use the default one.",
+      failureAlertAccountIdHelp:
+        "Use a specific account when failure alerts should not use the default one.",
       bestEffortDelivery: "Best effort delivery",
       bestEffortHelp: "Do not fail the job if delivery itself fails.",
       cantAddYet: "Can't add job yet",

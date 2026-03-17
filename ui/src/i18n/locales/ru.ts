@@ -97,7 +97,8 @@ export const ru: TranslationMap = {
       uptime: "Время работы",
       tickInterval: "Интервал тиков",
       lastChannelsRefresh: "Последнее обновление каналов",
-      channelsHint: "Используйте «Каналы» для подключения WhatsApp, Telegram, Discord, Signal или iMessage.",
+      channelsHint:
+        "Используйте «Каналы» для подключения WhatsApp, Telegram, Discord, Signal или iMessage.",
     },
     stats: {
       instances: "Экземпляры",
@@ -151,8 +152,11 @@ export const ru: TranslationMap = {
       disableFromPool: "Отключить в пуле",
       enableInPool: "Включить в пул",
       deleteProfile: "Удалить профиль",
+      deleteProfileConfirm: "Подтвердить удаление",
       deleteConfirm: "Удалить профиль {profileId}? Это действие нельзя отменить.",
       resetOrder: "Сбросить порядок",
+      resetOrderDisabled: "Для этого провайдера нет сохранённого ручного порядка.",
+      makePrimaryDisabledCurrent: "Этот профиль уже является активным основным профилем.",
       typeOauth: "OAuth",
       typeToken: "Токен",
       typeApiKey: "API key",
@@ -179,14 +183,16 @@ export const ru: TranslationMap = {
       title: "Заметки",
       subtitle: "Быстрые напоминания для удалённых настроек управления.",
       tailscaleTitle: "Tailscale serve",
-      tailscaleText: "Предпочтительно использовать режим serve для работы шлюза на loopback с аутентификацией tailnet.",
+      tailscaleText:
+        "Предпочтительно использовать режим serve для работы шлюза на loopback с аутентификацией tailnet.",
       sessionTitle: "Гигиена сессий",
       sessionText: "Используйте /new или sessions.patch для сброса контекста.",
       cronTitle: "Напоминания о задачах",
       cronText: "Используйте изолированные сессии для периодических запусков.",
     },
     auth: {
-      required: "Этот шлюз требует аутентификации. Добавьте токен или пароль, затем нажмите «Подключить».",
+      required:
+        "Этот шлюз требует аутентификации. Добавьте токен или пароль, затем нажмите «Подключить».",
       failed:
         "Ошибка аутентификации. Скопируйте URL с токеном заново через {command} или обновите токен, затем нажмите «Подключить».",
     },
@@ -250,7 +256,8 @@ export const ru: TranslationMap = {
     modeModelAuth: "Настройка авторизации для {provider}",
     loading: "Запуск мастера...",
     waiting: "Ожидание следующего шага...",
-    doneMessage: "Мастер завершён. Закрой это окно и при необходимости обнови страницу, чтобы увидеть новое состояние.",
+    doneMessage:
+      "Мастер завершён. Закрой это окно и при необходимости обнови страницу, чтобы увидеть новое состояние.",
     cancelledMessage: "Мастер был отменён.",
     errorMessage: "Мастер остановился с ошибкой.",
     submit: "Отправить",
@@ -347,7 +354,8 @@ export const ru: TranslationMap = {
     displayName: "Отображаемое имя",
     about: "О себе",
     nip05: "NIP-05",
-    noProfile: "Профиль не задан. Нажмите «Редактировать профиль», чтобы добавить имя, био и аватар.",
+    noProfile:
+      "Профиль не задан. Нажмите «Редактировать профиль», чтобы добавить имя, био и аватар.",
     nostrForm: {
       profilePicturePreview: "Предпросмотр фото профиля",
       accountLabel: "Аккаунт: {accountId}",
@@ -407,7 +415,8 @@ export const ru: TranslationMap = {
     updating: "Обновление...",
     viewPendingChanges: "Показать ожидающие изменения ({count})",
     loadingSchema: "Загрузка схемы...",
-    formUnsafeWarning: "Режим формы не может безопасно редактировать некоторые поля. Используйте Raw, чтобы не потерять записи конфигурации.",
+    formUnsafeWarning:
+      "Режим формы не может безопасно редактировать некоторые поля. Используйте Raw, чтобы не потерять записи конфигурации.",
     rawJson5: "Raw JSON5",
     schemaUnavailableUseRaw: "Схема недоступна. Используйте Raw.",
     empty: {
@@ -415,20 +424,35 @@ export const ru: TranslationMap = {
       noSettingsInSection: "В этом разделе нет настроек",
     },
     sectionMeta: {
-      env: { label: "Окружение", description: "Переменные окружения, передаваемые процессу шлюза." },
+      env: {
+        label: "Окружение",
+        description: "Переменные окружения, передаваемые процессу шлюза.",
+      },
       update: { label: "Обновления", description: "Настройки автообновления и канал релизов." },
       agents: { label: "Агенты", description: "Конфигурации агентов, модели и идентичности." },
       auth: { label: "Аутентификация", description: "API-ключи и профили аутентификации." },
-      channels: { label: "Каналы", description: "Каналы сообщений: Telegram, Discord, Slack и другие." },
-      messages: { label: "Сообщения", description: "Настройки обработки и маршрутизации сообщений." },
+      channels: {
+        label: "Каналы",
+        description: "Каналы сообщений: Telegram, Discord, Slack и другие.",
+      },
+      messages: {
+        label: "Сообщения",
+        description: "Настройки обработки и маршрутизации сообщений.",
+      },
       commands: { label: "Команды", description: "Пользовательские slash-команды." },
       hooks: { label: "Хуки", description: "Webhook-и и event hooks." },
       skills: { label: "Навыки", description: "Пакеты навыков и возможности." },
-      tools: { label: "Инструменты", description: "Настройки инструментов, например браузера и поиска." },
+      tools: {
+        label: "Инструменты",
+        description: "Настройки инструментов, например браузера и поиска.",
+      },
       gateway: { label: "Шлюз", description: "Настройки сервера шлюза: порт, auth и bind." },
       wizard: { label: "Мастер настройки", description: "Состояние и история мастера настройки." },
       meta: { label: "Метаданные", description: "Метаданные шлюза и информация о версии." },
-      diagnostics: { label: "Диагностика", description: "Проверки состояния, пробы и служебная диагностика." },
+      diagnostics: {
+        label: "Диагностика",
+        description: "Проверки состояния, пробы и служебная диагностика.",
+      },
       logging: { label: "Логирование", description: "Уровни логов и конфигурация вывода." },
       cli: { label: "CLI", description: "Поведение CLI и параметры команд по умолчанию." },
       browser: { label: "Браузер", description: "Настройки автоматизации браузера." },
@@ -438,14 +462,20 @@ export const ru: TranslationMap = {
       broadcast: { label: "Рассылка", description: "Настройки рассылки и уведомлений." },
       audio: { label: "Аудио", description: "Настройки аудиовхода и аудиовыхода." },
       media: { label: "Медиа", description: "Обработка, хранение и доставка медиа." },
-      approvals: { label: "Подтверждения", description: "Запросы подтверждения, политики и безопасные настройки по умолчанию." },
+      approvals: {
+        label: "Подтверждения",
+        description: "Запросы подтверждения, политики и безопасные настройки по умолчанию.",
+      },
       session: { label: "Сессия", description: "Управление сессиями и их хранением." },
       cron: { label: "Cron", description: "Запланированные задачи и автоматизация." },
       web: { label: "Веб", description: "Настройки веб-сервера и API." },
       discovery: { label: "Обнаружение", description: "Обнаружение сервисов и сетевые настройки." },
       secrets: { label: "Секреты", description: "Хранилище секретов и правила их разрешения." },
       acp: { label: "ACP", description: "Настройки control plane агента и подтверждений." },
-      nodeHost: { label: "Хост узлов", description: "Хостинг узлов, сопряжение и удалённое выполнение." },
+      nodeHost: {
+        label: "Хост узлов",
+        description: "Хостинг узлов, сопряжение и удалённое выполнение.",
+      },
       canvasHost: { label: "Хост Canvas", description: "Рендеринг Canvas и вывод на дисплей." },
       talk: { label: "Голос", description: "Настройки голоса и речи." },
       memory: { label: "Память", description: "Индексация, поиск и хранение памяти." },
@@ -476,11 +506,17 @@ export const ru: TranslationMap = {
           help: 'Режим выполнения мастера, записанный как "local" или "remote" для последнего onboarding-потока.',
         },
       },
-      accounts: { label: "Аккаунты", help: "Настроенные аккаунты для этого канала или провайдера." },
+      accounts: {
+        label: "Аккаунты",
+        help: "Настроенные аккаунты для этого канала или провайдера.",
+      },
       account: { label: "Аккаунт" },
       ackReaction: { label: "Реакция подтверждения" },
       actions: { label: "Действия" },
-      allowFrom: { label: "Разрешить от", help: "Разрешённые отправители, пользователи или собеседники." },
+      allowFrom: {
+        label: "Разрешить от",
+        help: "Разрешённые отправители, пользователи или собеседники.",
+      },
       attachmentRoots: { label: "Корни вложений" },
       autoStart: { label: "Автозапуск" },
       baseUrl: { label: "Базовый URL" },
@@ -863,7 +899,8 @@ export const ru: TranslationMap = {
     },
     tools: {
       title: "Доступ к инструментам",
-      subtitle: "Проверяйте политику инструментов, быстрые профили и переопределения для отдельных инструментов.",
+      subtitle:
+        "Проверяйте политику инструментов, быстрые профили и переопределения для отдельных инструментов.",
       enabledCount: "Включено: {enabled}/{total}",
       enableAll: "Включить всё",
       disableAll: "Отключить всё",
@@ -988,7 +1025,8 @@ export const ru: TranslationMap = {
       loadHint: "Загрузите подтверждения exec, чтобы редактировать список разрешений.",
       load: "Загрузить подтверждения",
       target: "Цель",
-      targetSubtitle: "Шлюз редактирует локальные подтверждения, узел — подтверждения выбранного узла.",
+      targetSubtitle:
+        "Шлюз редактирует локальные подтверждения, узел — подтверждения выбранного узла.",
       host: "Хост",
       gateway: "Шлюз",
       node: "Узел",
@@ -1083,8 +1121,7 @@ export const ru: TranslationMap = {
       warnings: "{count} предупреждений",
       noCritical: "Критических проблем нет",
       info: "info",
-      audit:
-        "Аудит безопасности: {summary}. Для деталей запустите openclaw security audit --deep.",
+      audit: "Аудит безопасности: {summary}. Для деталей запустите openclaw security audit --deep.",
     },
   },
   usage: {
@@ -1098,7 +1135,8 @@ export const ru: TranslationMap = {
     sessionsCount: "{count} сессий",
     sessionsMatch: "{matched} из {total} сессий совпадают",
     sessionsInRange: "{total} сессий в диапазоне",
-    sessionsLimitReached: "Показаны первые 1 000 сессий. Сузьте диапазон дат для полного результата.",
+    sessionsLimitReached:
+      "Показаны первые 1 000 сессий. Сузьте диапазон дат для полного результата.",
     filtersTitle: "Фильтры",
     selectRangeHint: "Выберите диапазон дат и нажмите «Обновить», чтобы загрузить использование.",
     pin: "Закрепить",
@@ -1114,7 +1152,8 @@ export const ru: TranslationMap = {
     timeZone: "Часовой пояс",
     localTime: "Локальный",
     utcTime: "UTC",
-    queryPlaceholder: "Фильтр сессий (например: key:agent:main:cron* model:gpt-4o has:errors minTokens:2000)",
+    queryPlaceholder:
+      "Фильтр сессий (например: key:agent:main:cron* model:gpt-4o has:errors minTokens:2000)",
     filterClientSide: "Фильтровать (на клиенте)",
     filterAgent: "Агент",
     filterChannel: "Канал",
@@ -1266,7 +1305,8 @@ export const ru: TranslationMap = {
     costPerMin: "{value} / мин",
     cacheHitHint: "Доля попаданий кэша = cache read / (input + cache read). Чем выше, тем лучше.",
     errorRateHint: "Доля ошибок = errors / total messages. Чем ниже, тем лучше.",
-    throughputHint: "Пропускная способность показывает токены в минуту активного времени. Чем выше, тем лучше.",
+    throughputHint:
+      "Пропускная способность показывает токены в минуту активного времени. Чем выше, тем лучше.",
     avgTokensHint: "Среднее число токенов на сообщение в этом диапазоне.",
     avgCostHint: "Средняя стоимость на сообщение, когда провайдеры отдают данные по стоимости.",
     avgCostHintMissing:
@@ -1445,7 +1485,8 @@ export const ru: TranslationMap = {
       lightContext: "Лёгкий контекст",
       lightContextHelp: "Использовать облегчённый стартовый контекст для этой задачи агента.",
       failureAlerts: "Оповещения о сбоях",
-      failureAlertsHelp: "Управляет отправкой повторных оповещений о сериях ошибок для этой задачи.",
+      failureAlertsHelp:
+        "Управляет отправкой повторных оповещений о сериях ошибок для этой задачи.",
       failureAlertsInherit: "Наследовать глобальную настройку",
       failureAlertsDisabled: "Отключить для этой задачи",
       failureAlertsCustom: "Задать отдельно для задачи",
@@ -1463,7 +1504,8 @@ export const ru: TranslationMap = {
       failureAlertModeWebhook: "Webhook (HTTP POST)",
       failureAlertAccountId: "ID аккаунта оповещений",
       failureAlertAccountIdPlaceholder: "ID аккаунта для мультиаккаунтной конфигурации",
-      failureAlertAccountIdHelp: "Используется, когда нужно отправлять оповещения через конкретный аккаунт канала.",
+      failureAlertAccountIdHelp:
+        "Используется, когда нужно отправлять оповещения через конкретный аккаунт канала.",
       bestEffortDelivery: "Best effort доставка",
       bestEffortHelp: "Не считать задачу неуспешной, если сломалась именно доставка.",
       cantAddYet: "Пока нельзя добавить задачу",
