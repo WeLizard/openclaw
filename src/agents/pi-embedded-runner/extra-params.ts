@@ -26,6 +26,7 @@ import {
   shouldApplySiliconFlowThinkingOffCompat,
 } from "./moonshot-stream-wrappers.js";
 import {
+  createOpenAIAttributionHeadersWrapper,
   createOpenAIDefaultTransportWrapper,
   createOpenAIFastModeWrapper,
   createOpenAIResponsesContextManagementWrapper,
@@ -264,7 +265,7 @@ function createParallelToolCallsWrapper(
 
 /**
  * Apply extra params (like temperature) to an agent's streamFn.
- * Also adds OpenRouter app attribution headers when using the OpenRouter provider.
+ * Also applies verified provider-specific request wrappers, such as OpenRouter attribution.
  *
  * @internal Exported for testing
  */
@@ -276,6 +277,7 @@ export function applyExtraParamsToAgent(
   extraParamsOverride?: Record<string, unknown>,
   thinkingLevel?: ThinkLevel,
   agentId?: string,
+  workspaceDir?: string,
 ): void {
   const resolvedExtraParams = resolveExtraParams({
     cfg,
@@ -303,9 +305,12 @@ export function applyExtraParamsToAgent(
       },
     }) ?? merged;
 
-  if (provider === "openai") {
-    // Default OpenAI Responses to WebSocket-first with transparent SSE fallback.
-    agent.streamFn = createOpenAIDefaultTransportWrapper(agent.streamFn);
+  if (provider === "openai" || provider === "openai-codex") {
+    if (provider === "openai") {
+      // Default OpenAI Responses to WebSocket-first with transparent SSE fallback.
+      agent.streamFn = createOpenAIDefaultTransportWrapper(agent.streamFn);
+    }
+    agent.streamFn = createOpenAIAttributionHeadersWrapper(agent.streamFn);
   }
   const wrappedStreamFn = createStreamFnWithExtraParams(
     agent.streamFn,
@@ -333,7 +338,10 @@ export function applyExtraParamsToAgent(
     agent.streamFn = createSiliconFlowThinkingWrapper(agent.streamFn);
   }
 
-  agent.streamFn = createAnthropicToolPayloadCompatibilityWrapper(agent.streamFn);
+  agent.streamFn = createAnthropicToolPayloadCompatibilityWrapper(agent.streamFn, {
+    config: cfg,
+    workspaceDir,
+  });
   const providerStreamBase = agent.streamFn;
   const pluginWrappedStreamFn = wrapProviderStreamFn({
     provider,

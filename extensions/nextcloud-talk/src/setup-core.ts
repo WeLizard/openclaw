@@ -1,27 +1,27 @@
+import type { ChannelSetupAdapter } from "openclaw/plugin-sdk/channel-runtime";
+import type { ChannelSetupInput } from "openclaw/plugin-sdk/channel-runtime";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
+import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "openclaw/plugin-sdk/routing";
 import {
   applyAccountNameToChannelSection,
   patchScopedAccountConfig,
-} from "../../../src/channels/plugins/setup-helpers.js";
+} from "openclaw/plugin-sdk/setup";
 import {
   mergeAllowFromEntries,
+  createTopLevelChannelDmPolicy,
   resolveSetupAccountId,
   setSetupChannelEnabled,
-  setTopLevelChannelDmPolicyWithAllowFrom,
-} from "../../../src/channels/plugins/setup-wizard-helpers.js";
-import type { ChannelSetupDmPolicy } from "../../../src/channels/plugins/setup-wizard-types.js";
-import { type ChannelSetupWizard } from "../../../src/channels/plugins/setup-wizard.js";
-import type { ChannelSetupAdapter } from "../../../src/channels/plugins/types.adapters.js";
-import type { ChannelSetupInput } from "../../../src/channels/plugins/types.core.js";
-import type { OpenClawConfig } from "../../../src/config/config.js";
-import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../../../src/routing/session-key.js";
-import { formatDocsLink } from "../../../src/terminal/links.js";
-import type { WizardPrompter } from "../../../src/wizard/prompts.js";
+} from "openclaw/plugin-sdk/setup";
+import type { ChannelSetupDmPolicy } from "openclaw/plugin-sdk/setup";
+import { type ChannelSetupWizard } from "openclaw/plugin-sdk/setup";
+import { formatDocsLink } from "openclaw/plugin-sdk/setup";
+import type { WizardPrompter } from "openclaw/plugin-sdk/setup";
 import {
   listNextcloudTalkAccountIds,
   resolveDefaultNextcloudTalkAccountId,
   resolveNextcloudTalkAccount,
 } from "./accounts.js";
-import type { CoreConfig, DmPolicy } from "./types.js";
+import type { CoreConfig } from "./types.js";
 
 const channel = "nextcloud-talk" as const;
 
@@ -44,14 +44,6 @@ export function validateNextcloudTalkBaseUrl(value: string): string | undefined 
     return "URL must start with http:// or https://";
   }
   return undefined;
-}
-
-function setNextcloudTalkDmPolicy(cfg: CoreConfig, dmPolicy: DmPolicy): CoreConfig {
-  return setTopLevelChannelDmPolicyWithAllowFrom({
-    cfg,
-    channel,
-    dmPolicy,
-  }) as CoreConfig;
 }
 
 export function setNextcloudTalkAccountConfig(
@@ -174,15 +166,14 @@ async function promptNextcloudTalkAllowFromForAccount(params: {
   });
 }
 
-const nextcloudTalkDmPolicy: ChannelSetupDmPolicy = {
+export const nextcloudTalkDmPolicy: ChannelSetupDmPolicy = createTopLevelChannelDmPolicy({
   label: "Nextcloud Talk",
   channel,
   policyKey: "channels.nextcloud-talk.dmPolicy",
   allowFromKey: "channels.nextcloud-talk.allowFrom",
   getCurrent: (cfg) => cfg.channels?.["nextcloud-talk"]?.dmPolicy ?? "pairing",
-  setPolicy: (cfg, policy) => setNextcloudTalkDmPolicy(cfg as CoreConfig, policy as DmPolicy),
   promptAllowFrom: promptNextcloudTalkAllowFromForAccount,
-};
+});
 
 export const nextcloudTalkSetupAdapter: ChannelSetupAdapter = {
   resolveAccountId: ({ accountId }) => normalizeAccountId(accountId),

@@ -1,13 +1,13 @@
 import {
+  createTopLevelChannelDmPolicy,
+  DEFAULT_ACCOUNT_ID,
+  formatDocsLink,
+  resolveLineAccount,
   setSetupChannelEnabled,
-  setTopLevelChannelDmPolicyWithAllowFrom,
   splitSetupEntries,
-} from "../../../src/channels/plugins/setup-wizard-helpers.js";
-import type { ChannelSetupDmPolicy } from "../../../src/channels/plugins/setup-wizard-types.js";
-import type { ChannelSetupWizard } from "../../../src/channels/plugins/setup-wizard.js";
-import { resolveLineAccount } from "../../../src/line/accounts.js";
-import { DEFAULT_ACCOUNT_ID } from "../../../src/routing/session-key.js";
-import { formatDocsLink } from "../../../src/terminal/links.js";
+  type ChannelSetupDmPolicy,
+  type ChannelSetupWizard,
+} from "openclaw/plugin-sdk/line-core";
 import {
   isLineConfigured,
   listLineAccountIds,
@@ -35,19 +35,13 @@ const LINE_ALLOW_FROM_HELP_LINES = [
   `Docs: ${formatDocsLink("/channels/line", "channels/line")}`,
 ];
 
-const lineDmPolicy: ChannelSetupDmPolicy = {
+const lineDmPolicy: ChannelSetupDmPolicy = createTopLevelChannelDmPolicy({
   label: "LINE",
   channel,
   policyKey: "channels.line.dmPolicy",
   allowFromKey: "channels.line.allowFrom",
   getCurrent: (cfg) => cfg.channels?.line?.dmPolicy ?? "pairing",
-  setPolicy: (cfg, policy) =>
-    setTopLevelChannelDmPolicyWithAllowFrom({
-      cfg,
-      channel,
-      dmPolicy: policy,
-    }),
-};
+});
 
 export { lineSetupAdapter } from "./setup-core.js";
 

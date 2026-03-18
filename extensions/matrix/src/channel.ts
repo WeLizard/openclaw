@@ -1,10 +1,14 @@
 import {
-  buildOpenGroupPolicyWarning,
-  collectAllowlistProviderGroupPolicyWarnings,
   createScopedAccountConfigAccessors,
   createScopedChannelConfigBase,
   createScopedDmSecurityResolver,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/channel-config-helpers";
+import {
+  buildOpenGroupPolicyWarning,
+  collectAllowlistProviderGroupPolicyWarnings,
+} from "openclaw/plugin-sdk/channel-policy";
+import { createLazyRuntimeNamedExport } from "openclaw/plugin-sdk/lazy-runtime";
+import { buildTrafficStatusSummary } from "../../shared/channel-status-summary.js";
 import {
   buildChannelConfigSchema,
   buildProbeChannelStatusSummary,
@@ -12,8 +16,7 @@ import {
   DEFAULT_ACCOUNT_ID,
   PAIRING_APPROVED_MESSAGE,
   type ChannelPlugin,
-} from "openclaw/plugin-sdk/matrix";
-import { buildTrafficStatusSummary } from "../../shared/channel-status-summary.js";
+} from "../runtime-api.js";
 import { matrixMessageActions } from "./actions.js";
 import { MatrixConfigSchema } from "./config-schema.js";
 import {
@@ -36,9 +39,10 @@ import type { CoreConfig } from "./types.js";
 // Mutex for serializing account startup (workaround for concurrent dynamic import race condition)
 let matrixStartupLock: Promise<void> = Promise.resolve();
 
-async function loadMatrixChannelRuntime() {
-  return await import("./channel.runtime.js");
-}
+const loadMatrixChannelRuntime = createLazyRuntimeNamedExport(
+  () => import("./channel.runtime.js"),
+  "matrixChannelRuntime",
+);
 
 const meta = {
   id: "matrix",

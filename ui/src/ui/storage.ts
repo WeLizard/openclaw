@@ -1,4 +1,5 @@
 const SETTINGS_KEY_PREFIX = "openclaw.control.settings.v1:";
+const LEGACY_SETTINGS_KEY = "openclaw.control.settings.v1";
 const LEGACY_TOKEN_SESSION_KEY = "openclaw.control.token.v1";
 const TOKEN_SESSION_KEY_PREFIX = "openclaw.control.token.v1:";
 const MAX_SCOPED_SESSION_ENTRIES = 10;
@@ -357,6 +358,9 @@ function persistSettings(next: UiSettings) {
     sessionsByGateway,
     ...(next.locale ? { locale: next.locale } : {}),
   };
-  storage?.setItem(scopedKey, JSON.stringify(persisted));
-  storage?.setItem("openclaw.control.settings.v1", JSON.stringify(persisted));
+  const serialized = JSON.stringify(persisted);
+  storage?.setItem(scopedKey, serialized);
+  // Keep the legacy unscoped key in sync for older readers and migration tests,
+  // but never include the session token in persistent storage.
+  storage?.setItem(LEGACY_SETTINGS_KEY, serialized);
 }

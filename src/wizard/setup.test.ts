@@ -4,23 +4,20 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createWizardPrompter as buildWizardPrompter } from "../../test/helpers/wizard-prompter.js";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../agents/workspace.js";
+import type { PluginCompatibilityNotice } from "../plugins/status.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { runOnboardingWizard } from "./setup.js";
 import type { WizardPrompter, WizardSelectParams } from "./prompts.js";
+import { runSetupWizard } from "./setup.js";
 
 const ensureAuthProfileStore = vi.hoisted(() => vi.fn(() => ({ profiles: {} })));
 const promptAuthChoiceGrouped = vi.hoisted(() => vi.fn(async () => "skip"));
 const applyAuthChoice = vi.hoisted(() => vi.fn(async (args) => ({ config: args.config })));
-const resolvePreferredProviderForAuthChoice = vi.hoisted(() => vi.fn(() => "openai"));
+const resolvePreferredProviderForAuthChoice = vi.hoisted(() => vi.fn(async () => "openai"));
 const warnIfModelConfigLooksOff = vi.hoisted(() => vi.fn(async () => {}));
 const applyPrimaryModel = vi.hoisted(() => vi.fn((cfg) => cfg));
 const promptDefaultModel = vi.hoisted(() => vi.fn(async () => ({ config: null, model: null })));
 const promptCustomApiConfig = vi.hoisted(() => vi.fn(async (args) => ({ config: args.config })));
-const finalizeCustomApiConfig = vi.hoisted(() =>
-  vi.fn(async ({ result }: { result: { config: unknown } }) => result.config),
-);
-const resolveExistingCustomProviderContext = vi.hoisted(() => vi.fn(() => null));
-const configureGatewayForOnboarding = vi.hoisted(() =>
+const configureGatewayForSetup = vi.hoisted(() =>
   vi.fn(async (args) => ({
     nextConfig: args.nextConfig,
     settings: {
@@ -33,7 +30,7 @@ const configureGatewayForOnboarding = vi.hoisted(() =>
     },
   })),
 );
-const finalizeOnboardingWizard = vi.hoisted(() =>
+const finalizeSetupWizard = vi.hoisted(() =>
   vi.fn(async (options) => {
     if (!options.nextConfig?.tools?.web?.search?.provider) {
       await options.prompter.note("Web search was skipped.", "Web search");
@@ -71,22 +68,6 @@ const setupChannels = vi.hoisted(() => vi.fn(async (cfg) => cfg));
 const setupSkills = vi.hoisted(() => vi.fn(async (cfg) => cfg));
 const healthCommand = vi.hoisted(() => vi.fn(async () => {}));
 const ensureWorkspaceAndSessions = vi.hoisted(() => vi.fn(async () => {}));
-const applyLocalSetupWorkspaceConfig = vi.hoisted(() =>
-  vi.fn((baseConfig, workspaceDir: string) => ({
-    ...baseConfig,
-    agents: {
-      ...baseConfig?.agents,
-      defaults: {
-        ...baseConfig?.agents?.defaults,
-        workspace: workspaceDir,
-      },
-    },
-    gateway: {
-      ...baseConfig?.gateway,
-      mode: "local",
-    },
-  })),
-);
 const writeConfigFile = vi.hoisted(() => vi.fn(async () => {}));
 const readConfigFileSnapshot = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -106,8 +87,11 @@ const ensureSystemdUserLingerInteractive = vi.hoisted(() => vi.fn(async () => {}
 const isSystemdUserServiceAvailable = vi.hoisted(() => vi.fn(async () => true));
 const ensureControlUiAssetsBuilt = vi.hoisted(() => vi.fn(async () => ({ ok: true })));
 const runTui = vi.hoisted(() => vi.fn(async (_options: unknown) => {}));
-const setupOnboardingShellCompletion = vi.hoisted(() => vi.fn(async () => {}));
+const setupWizardShellCompletion = vi.hoisted(() => vi.fn(async () => {}));
 const probeGatewayReachable = vi.hoisted(() => vi.fn(async () => ({ ok: true })));
+const buildPluginCompatibilityNotices = vi.hoisted(() =>
+  vi.fn((): PluginCompatibilityNotice[] => []),
+);
 
 vi.mock("../commands/onboard-channels.js", () => ({
   setupChannels,
@@ -138,8 +122,6 @@ vi.mock("../commands/model-picker.js", () => ({
 
 vi.mock("../commands/onboard-custom.js", () => ({
   promptCustomApiConfig,
-  finalizeCustomApiConfig,
-  resolveExistingCustomProviderContext,
 }));
 
 vi.mock("../commands/health.js", () => ({
@@ -182,10 +164,6 @@ vi.mock("../commands/onboard-helpers.js", () => ({
   })),
 }));
 
-vi.mock("../commands/onboard-config.js", () => ({
-  applyLocalSetupWorkspaceConfig,
-}));
-
 vi.mock("../commands/systemd-linger.js", () => ({
   ensureSystemdUserLingerInteractive,
 }));
@@ -196,6 +174,10 @@ vi.mock("../daemon/systemd.js", () => ({
 
 vi.mock("../infra/control-ui-assets.js", () => ({
   ensureControlUiAssetsBuilt,
+}));
+
+vi.mock("../plugins/status.js", () => ({
+  buildPluginCompatibilityNotices,
 }));
 
 vi.mock("../channels/plugins/index.js", () => ({
@@ -211,15 +193,15 @@ vi.mock("../tui/tui.js", () => ({
 }));
 
 vi.mock("./setup.gateway-config.js", () => ({
-  configureGatewayForSetup: configureGatewayForOnboarding,
+  configureGatewayForSetup,
 }));
 
 vi.mock("./setup.finalize.js", () => ({
-  finalizeSetupWizard: finalizeOnboardingWizard,
+  finalizeSetupWizard,
 }));
 
 vi.mock("./setup.completion.js", () => ({
-  setupWizardShellCompletion: setupOnboardingShellCompletion,
+  setupWizardShellCompletion,
 }));
 
 function createRuntime(opts?: { throwsOnExit?: boolean }): RuntimeEnv {
@@ -240,7 +222,7 @@ function createRuntime(opts?: { throwsOnExit?: boolean }): RuntimeEnv {
   };
 }
 
-describe("runOnboardingWizard", () => {
+describe("runSetupWizard", () => {
   let suiteRoot = "";
   let suiteCase = 0;
 
@@ -281,7 +263,7 @@ describe("runOnboardingWizard", () => {
     const runtime = createRuntime({ throwsOnExit: true });
 
     await expect(
-      runOnboardingWizard(
+      runSetupWizard(
         {
           acceptRisk: true,
           flow: "quickstart",
@@ -310,7 +292,7 @@ describe("runOnboardingWizard", () => {
     const prompter = buildWizardPrompter({ select, multiselect });
     const runtime = createRuntime({ throwsOnExit: true });
 
-    await runOnboardingWizard(
+    await runSetupWizard(
       {
         acceptRisk: true,
         flow: "quickstart",
@@ -354,7 +336,7 @@ describe("runOnboardingWizard", () => {
     const prompter = buildWizardPrompter({ select });
     const runtime = createRuntime({ throwsOnExit: true });
 
-    await runOnboardingWizard(
+    await runSetupWizard(
       {
         acceptRisk: true,
         flow: "quickstart",
@@ -387,7 +369,7 @@ describe("runOnboardingWizard", () => {
     await runTuiHatchTest({ writeBootstrapFile: false, expectedMessage: undefined });
   });
 
-  it("shows the web search hint at the end of onboarding", async () => {
+  it("shows the web search hint at the end of setup", async () => {
     const prevBraveKey = process.env.BRAVE_API_KEY;
     delete process.env.BRAVE_API_KEY;
 
@@ -396,7 +378,7 @@ describe("runOnboardingWizard", () => {
       const prompter = buildWizardPrompter({ note });
       const runtime = createRuntime();
 
-      await runOnboardingWizard(
+      await runSetupWizard(
         {
           acceptRisk: true,
           flow: "quickstart",
@@ -424,94 +406,70 @@ describe("runOnboardingWizard", () => {
     }
   });
 
-  it("runs provider auth flow without entering full onboarding", async () => {
-    promptAuthChoiceGrouped.mockClear();
-    applyAuthChoice.mockClear();
-    promptCustomApiConfig.mockClear();
-    finalizeCustomApiConfig.mockClear();
-    resolveExistingCustomProviderContext.mockClear();
-    setupChannels.mockClear();
-    setupSkills.mockClear();
-    configureGatewayForOnboarding.mockClear();
+  it("shows plugin compatibility notices for an existing valid config", async () => {
+    buildPluginCompatibilityNotices.mockReturnValue([
+      {
+        pluginId: "legacy-plugin",
+        code: "legacy-before-agent-start",
+        severity: "warn",
+        message:
+          "still relies on legacy before_agent_start; keep upgrade coverage on this plugin and prefer before_model_resolve/before_prompt_build for new work.",
+      },
+    ]);
+    readConfigFileSnapshot.mockResolvedValueOnce({
+      path: "/tmp/.openclaw/openclaw.json",
+      exists: true,
+      raw: "{}",
+      parsed: {},
+      resolved: {},
+      valid: true,
+      config: {
+        gateway: {},
+      },
+      issues: [],
+      warnings: [],
+      legacyIssues: [],
+    });
 
-    promptAuthChoiceGrouped.mockResolvedValueOnce("qwen-portal");
-    const prompter = buildWizardPrompter({});
+    const note: WizardPrompter["note"] = vi.fn(async () => {});
+    const select = vi.fn(async (opts: WizardSelectParams<unknown>) => {
+      if (opts.message === "Config handling") {
+        return "keep";
+      }
+      return "quickstart";
+    }) as unknown as WizardPrompter["select"];
+    const prompter = buildWizardPrompter({ note, select });
     const runtime = createRuntime();
 
-    await runOnboardingWizard(
+    await runSetupWizard(
       {
-        intent: "models-auth-login",
-        provider: "qwen-portal",
-        oauthOnly: true,
+        acceptRisk: true,
+        flow: "quickstart",
+        authChoice: "skip",
+        installDaemon: false,
+        skipProviders: true,
+        skipSkills: true,
+        skipSearch: true,
+        skipHealth: true,
+        skipUi: true,
       },
       runtime,
       prompter,
     );
 
-    expect(promptAuthChoiceGrouped).toHaveBeenCalledWith(
-      expect.objectContaining({
-        includeSkip: false,
-        provider: "qwen-portal",
-        oauthOnly: true,
+    const calls = (note as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(calls.some((call) => call?.[1] === "Plugin compatibility")).toBe(true);
+    expect(
+      calls.some((call) => {
+        const body = call?.[0];
+        return typeof body === "string" && body.includes("legacy-plugin");
       }),
-    );
-    expect(applyAuthChoice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        authChoice: "qwen-portal",
-        setDefaultModel: false,
-      }),
-    );
-    expect(setupChannels).not.toHaveBeenCalled();
-    expect(setupSkills).not.toHaveBeenCalled();
-    expect(configureGatewayForOnboarding).not.toHaveBeenCalled();
-    expect(prompter.intro).toHaveBeenCalledWith("Provider auth");
+    ).toBe(true);
   });
 
-  it("reuses existing custom provider context during provider auth", async () => {
-    promptAuthChoiceGrouped.mockClear();
-    applyAuthChoice.mockClear();
-    promptCustomApiConfig.mockClear();
-    finalizeCustomApiConfig.mockClear();
-    resolveExistingCustomProviderContext.mockClear();
-
-    resolveExistingCustomProviderContext.mockReturnValueOnce({
-      providerId: "cliproxy",
-      baseUrl: "http://192.168.0.52:8317/v1",
-      modelId: "gpt-5.4",
-      compatibility: "openai",
-    } as never);
-
-    const prompter = buildWizardPrompter({});
-    const runtime = createRuntime();
-
-    await runOnboardingWizard(
-      {
-        intent: "models-auth-login",
-        provider: "cliproxy",
-      },
-      runtime,
-      prompter,
-    );
-
-    expect(resolveExistingCustomProviderContext).toHaveBeenCalledWith(expect.any(Object), "cliproxy");
-    expect(promptAuthChoiceGrouped).not.toHaveBeenCalled();
-    expect(promptCustomApiConfig).toHaveBeenCalledWith(
-      expect.objectContaining({
-        initialBaseUrl: "http://192.168.0.52:8317/v1",
-        initialModelId: "gpt-5.4",
-        initialProviderId: "cliproxy",
-        initialCompatibility: "openai",
-      }),
-    );
-    expect(finalizeCustomApiConfig).toHaveBeenCalled();
-    expect(applyAuthChoice).not.toHaveBeenCalled();
-    expect(setupChannels).not.toHaveBeenCalled();
-    expect(setupSkills).not.toHaveBeenCalled();
-  });
-
-  it("resolves gateway.auth.password SecretRef for local onboarding probe", async () => {
+  it("resolves gateway.auth.password SecretRef for local setup probe", async () => {
     const previous = process.env.OPENCLAW_GATEWAY_PASSWORD;
-    process.env.OPENCLAW_GATEWAY_PASSWORD = "gateway-ref-password";
+    process.env.OPENCLAW_GATEWAY_PASSWORD = "gateway-ref-password"; // pragma: allowlist secret
     probeGatewayReachable.mockClear();
     readConfigFileSnapshot.mockResolvedValueOnce({
       path: "/tmp/.openclaw/openclaw.json",
@@ -546,7 +504,7 @@ describe("runOnboardingWizard", () => {
     const runtime = createRuntime();
 
     try {
-      await runOnboardingWizard(
+      await runSetupWizard(
         {
           acceptRisk: true,
           flow: "quickstart",
@@ -573,17 +531,17 @@ describe("runOnboardingWizard", () => {
     expect(probeGatewayReachable).toHaveBeenCalledWith(
       expect.objectContaining({
         url: "ws://127.0.0.1:18789",
-        password: "gateway-ref-password",
+        password: "gateway-ref-password", // pragma: allowlist secret
       }),
     );
   });
 
   it("passes secretInputMode through to local gateway config step", async () => {
-    configureGatewayForOnboarding.mockClear();
+    configureGatewayForSetup.mockClear();
     const prompter = buildWizardPrompter({});
     const runtime = createRuntime();
 
-    await runOnboardingWizard(
+    await runSetupWizard(
       {
         acceptRisk: true,
         flow: "quickstart",
@@ -595,15 +553,15 @@ describe("runOnboardingWizard", () => {
         skipSearch: true,
         skipHealth: true,
         skipUi: true,
-        secretInputMode: "ref",
+        secretInputMode: "ref", // pragma: allowlist secret
       },
       runtime,
       prompter,
     );
 
-    expect(configureGatewayForOnboarding).toHaveBeenCalledWith(
+    expect(configureGatewayForSetup).toHaveBeenCalledWith(
       expect.objectContaining({
-        secretInputMode: "ref",
+        secretInputMode: "ref", // pragma: allowlist secret
       }),
     );
   });

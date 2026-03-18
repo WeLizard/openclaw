@@ -1,11 +1,13 @@
-import { createScopedChannelConfigBase } from "openclaw/plugin-sdk/compat";
+import { formatNormalizedAllowFromEntries } from "openclaw/plugin-sdk/allow-from";
+import {
+  createScopedAccountConfigAccessors,
+  createScopedChannelConfigBase,
+  createScopedDmSecurityResolver,
+} from "openclaw/plugin-sdk/channel-config-helpers";
 import {
   buildOpenGroupPolicyConfigureRouteAllowlistWarning,
   collectAllowlistProviderGroupPolicyWarnings,
-  createScopedAccountConfigAccessors,
-  createScopedDmSecurityResolver,
-  formatNormalizedAllowFromEntries,
-} from "openclaw/plugin-sdk/compat";
+} from "openclaw/plugin-sdk/channel-policy";
 import {
   buildComputedAccountStatusSnapshot,
   buildChannelConfigSchema,
@@ -17,7 +19,6 @@ import {
   missingTargetError,
   PAIRING_APPROVED_MESSAGE,
   resolveChannelMediaMaxBytes,
-  resolveGoogleChatGroupRequireMention,
   runPassiveAccountLifecycle,
   type ChannelMessageActionAdapter,
   type ChannelPlugin,
@@ -25,6 +26,7 @@ import {
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/googlechat";
 import { GoogleChatConfigSchema } from "openclaw/plugin-sdk/googlechat";
+import { createLazyRuntimeNamedExport } from "openclaw/plugin-sdk/lazy-runtime";
 import { buildPassiveProbedChannelStatusSummary } from "../../shared/channel-status-summary.js";
 import {
   listGoogleChatAccountIds,
@@ -33,6 +35,7 @@ import {
   type ResolvedGoogleChatAccount,
 } from "./accounts.js";
 import { googlechatMessageActions } from "./actions.js";
+import { resolveGoogleChatGroupRequireMention } from "./group-policy.js";
 import { getGoogleChatRuntime } from "./runtime.js";
 import { googlechatSetupAdapter } from "./setup-core.js";
 import { googlechatSetupWizard } from "./setup-surface.js";
@@ -45,9 +48,10 @@ import {
 
 const meta = getChatChannelMeta("googlechat");
 
-async function loadGoogleChatChannelRuntime() {
-  return await import("./channel.runtime.js");
-}
+const loadGoogleChatChannelRuntime = createLazyRuntimeNamedExport(
+  () => import("./channel.runtime.js"),
+  "googleChatChannelRuntime",
+);
 
 const formatAllowFromEntry = (entry: string) =>
   entry
@@ -94,7 +98,7 @@ const resolveGoogleChatDmPolicy = createScopedDmSecurityResolver<ResolvedGoogleC
 });
 
 const googlechatActions: ChannelMessageActionAdapter = {
-  listActions: (ctx) => googlechatMessageActions.listActions?.(ctx) ?? [],
+  describeMessageTool: (ctx) => googlechatMessageActions.describeMessageTool?.(ctx) ?? null,
   extractToolSend: (ctx) => googlechatMessageActions.extractToolSend?.(ctx) ?? null,
   handleAction: async (ctx) => {
     if (!googlechatMessageActions.handleAction) {
