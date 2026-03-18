@@ -42,6 +42,7 @@ import {
   loadOverview as loadOverviewInternal,
   setTab as setTabInternal,
   setTheme as setThemeInternal,
+  setThemeMode as setThemeModeInternal,
   onPopState as onPopStateInternal,
 } from "./app-settings.ts";
 import {
@@ -78,7 +79,7 @@ import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
-import type { ResolvedTheme, ThemeMode } from "./theme.ts";
+import type { ResolvedTheme, ThemeMode, ThemeName } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
@@ -143,7 +144,8 @@ export class OpenClawApp extends LitElement {
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
   @state() connected = false;
-  @state() theme: ThemeMode = this.settings.theme ?? "system";
+  @state() theme: ThemeName = this.settings.theme ?? "claw";
+  @state() themeMode: ThemeMode = this.settings.themeMode ?? "system";
   @state() themeResolved: ResolvedTheme = "dark";
   @state() hello: GatewayHelloOk | null = null;
   @state() lastError: string | null = null;
@@ -219,6 +221,26 @@ export class OpenClawApp extends LitElement {
   @state() configSearchQuery = "";
   @state() configActiveSection: string | null = null;
   @state() configActiveSubsection: string | null = null;
+  @state() communicationsFormMode: "form" | "raw" = "form";
+  @state() communicationsSearchQuery = "";
+  @state() communicationsActiveSection: string | null = null;
+  @state() communicationsActiveSubsection: string | null = null;
+  @state() appearanceFormMode: "form" | "raw" = "form";
+  @state() appearanceSearchQuery = "";
+  @state() appearanceActiveSection: string | null = null;
+  @state() appearanceActiveSubsection: string | null = null;
+  @state() automationFormMode: "form" | "raw" = "form";
+  @state() automationSearchQuery = "";
+  @state() automationActiveSection: string | null = null;
+  @state() automationActiveSubsection: string | null = null;
+  @state() infrastructureFormMode: "form" | "raw" = "form";
+  @state() infrastructureSearchQuery = "";
+  @state() infrastructureActiveSection: string | null = null;
+  @state() infrastructureActiveSubsection: string | null = null;
+  @state() aiAgentsFormMode: "form" | "raw" = "form";
+  @state() aiAgentsSearchQuery = "";
+  @state() aiAgentsActiveSection: string | null = null;
+  @state() aiAgentsActiveSubsection: string | null = null;
 
   @state() channelsLoading = false;
   @state() channelsSnapshot: ChannelsStatusSnapshot | null = null;
@@ -268,12 +290,21 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
   @state() sessionsHideCron = true;
+  @state() sessionsSearchQuery = "";
+  @state() sessionsSortColumn = "";
+  @state() sessionsSortDir: "asc" | "desc" = "desc";
+  @state() sessionsPage = 0;
+  @state() sessionsPageSize = 25;
+  @state() sessionsActionsOpenKey: string | null = null;
   @state() availableModelsLoading = false;
   @state() availableModels: ModelCatalogEntry[] = [];
   @state() attentionItems: import("./types.ts").AttentionItem[] = [];
   @state() overviewShowGatewayToken = false;
   @state() overviewShowGatewayPassword = false;
   @state() overviewLogLines: string[] = [];
+  @state() overviewLogCursor: number | null = null;
+  @state() loginShowGatewayToken = false;
+  @state() loginShowGatewayPassword = false;
   @state() modelAuthLoading = false;
   @state() modelAuthBusyKey: string | null = null;
   @state() modelAuthError: string | null = null;
@@ -426,6 +457,14 @@ export class OpenClawApp extends LitElement {
   private chatHasAutoScrolled = false;
   private chatUserNearBottom = true;
   @state() chatNewMessagesBelow = false;
+  @state() chatStreamSegments: unknown[] = [];
+  @state() chatModelOverrides: Record<string, import("./types.ts").ChatModelOverride | null> = {};
+  @state() chatModelsLoading = false;
+  @state() chatModelCatalog: import("./types.ts").ModelCatalogEntry[] = [];
+  @state() navDrawerOpen = false;
+  @state() paletteOpen = false;
+  @state() paletteQuery = "";
+  @state() paletteActiveIndex: number | null = null;
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
@@ -513,8 +552,12 @@ export class OpenClawApp extends LitElement {
     setTabInternal(this as unknown as Parameters<typeof setTabInternal>[0], next);
   }
 
-  setTheme(next: ThemeMode, context?: Parameters<typeof setThemeInternal>[2]) {
+  setTheme(next: ThemeName, context?: Parameters<typeof setThemeInternal>[2]) {
     setThemeInternal(this as unknown as Parameters<typeof setThemeInternal>[0], next, context);
+  }
+
+  setThemeMode(next: ThemeMode, context?: Parameters<typeof setThemeModeInternal>[2]) {
+    setThemeModeInternal(this as unknown as Parameters<typeof setThemeModeInternal>[0], next, context);
   }
 
   async loadOverview() {

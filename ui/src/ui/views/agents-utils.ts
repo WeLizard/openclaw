@@ -232,6 +232,15 @@ export function resolveModelPrimary(model?: unknown): string | null {
   return null;
 }
 
+/**
+ * Normalise a raw model identifier string for display / comparison.
+ * Returns a trimmed, non-empty string or `null`.
+ */
+export function normalizeModelValue(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim();
+  return trimmed || null;
+}
+
 export function resolveModelFallbacks(model?: unknown): string[] | null {
   if (!model || typeof model === "string") {
     return null;
@@ -508,4 +517,9 @@ export function matchesList(name: string, list?: string[]) {
 
 export function resolveToolProfile(profile: string) {
   return resolveToolProfilePolicy(profile) ?? undefined;
+}
+
+export function agentLogoUrl(basePath: string): string {
+  const prefix = basePath && basePath !== "/" ? basePath.replace(/\/+$/, "") + "/" : "";
+  return `${prefix}favicon.svg`;
 }

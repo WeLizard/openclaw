@@ -10,17 +10,19 @@ import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
-import type { ThemeMode } from "./theme.ts";
+import type { ThemeMode, ThemeName } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
+  ChatModelOverride,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
   HealthSnapshot,
   LogEntry,
   LogLevel,
+  ModelCatalogEntry,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
@@ -44,7 +46,8 @@ export type AppViewState = {
   onboarding: boolean;
   basePath: string;
   connected: boolean;
-  theme: ThemeMode;
+  theme: ThemeName;
+  themeMode: ThemeMode;
   themeResolved: "light" | "dark";
   hello: GatewayHelloOk | null;
   lastError: string | null;
@@ -69,9 +72,21 @@ export type AppViewState = {
   chatThinkingLevel: string | null;
   chatQueue: ChatQueueItem[];
   chatManualRefreshInFlight: boolean;
+  chatModelOverrides: Record<string, ChatModelOverride | null>;
+  chatModelsLoading: boolean;
+  chatModelCatalog: ModelCatalogEntry[];
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
+  chatStreamSegments: unknown[];
+  overviewLogLines: string[];
+  overviewShowGatewayToken: boolean;
+  overviewShowGatewayPassword: boolean;
+  attentionItems: import("./types.ts").AttentionItem[];
+  navDrawerOpen: boolean;
+  paletteOpen: boolean;
+  paletteQuery: string;
+  paletteActiveIndex: number | null;
   sidebarOpen: boolean;
   sidebarContent: string | null;
   sidebarError: string | null;
@@ -112,6 +127,26 @@ export type AppViewState = {
   configSearchQuery: string;
   configActiveSection: string | null;
   configActiveSubsection: string | null;
+  communicationsFormMode: "form" | "raw";
+  communicationsSearchQuery: string;
+  communicationsActiveSection: string | null;
+  communicationsActiveSubsection: string | null;
+  appearanceFormMode: "form" | "raw";
+  appearanceSearchQuery: string;
+  appearanceActiveSection: string | null;
+  appearanceActiveSubsection: string | null;
+  automationFormMode: "form" | "raw";
+  automationSearchQuery: string;
+  automationActiveSection: string | null;
+  automationActiveSubsection: string | null;
+  infrastructureFormMode: "form" | "raw";
+  infrastructureSearchQuery: string;
+  infrastructureActiveSection: string | null;
+  infrastructureActiveSubsection: string | null;
+  aiAgentsFormMode: "form" | "raw";
+  aiAgentsSearchQuery: string;
+  aiAgentsActiveSection: string | null;
+  aiAgentsActiveSubsection: string | null;
   channelsLoading: boolean;
   channelsSnapshot: ChannelsStatusSnapshot | null;
   channelsError: string | null;
@@ -157,6 +192,12 @@ export type AppViewState = {
   sessionsIncludeGlobal: boolean;
   sessionsIncludeUnknown: boolean;
   sessionsHideCron: boolean;
+  sessionsSearchQuery: string;
+  sessionsSortColumn: string;
+  sessionsSortDir: "asc" | "desc";
+  sessionsPage: number;
+  sessionsPageSize: number;
+  sessionsActionsOpenKey: string | null;
   availableModelsLoading: boolean;
   availableModels: import("./types.ts").ModelCatalogEntry[];
   modelAuthLoading: boolean;
@@ -278,12 +319,16 @@ export type AppViewState = {
     logsLimit: number;
     logsMaxBytes: number;
     logsAtBottom: boolean;
+    loginShowGatewayToken: boolean;
+    loginShowGatewayPassword: boolean;
+    overviewLogCursor: number | null;
     updateAvailable: import("./types.js").UpdateAvailable | null;
     client: GatewayBrowserClient | null;
     refreshSessionsAfterChat: Set<string>;
     connect: () => void;
     setTab: (tab: Tab) => void;
-    setTheme: (theme: ThemeMode, context?: ThemeTransitionContext) => void;
+    setTheme: (theme: ThemeName, context?: ThemeTransitionContext) => void;
+    setThemeMode: (mode: ThemeMode, context?: ThemeTransitionContext) => void;
     applySettings: (next: UiSettings) => void;
     loadOverview: () => Promise<void>;
     loadAssistantIdentity: () => Promise<void>;
@@ -330,6 +375,8 @@ export type AppViewState = {
     handleDisableModelAuthProfile: (profileId: string) => Promise<void>;
     handleEnableModelAuthProfile: (profileId: string) => Promise<void>;
     handleDeleteModelAuthProfile: (profileId: string) => Promise<void>;
+    requestDeleteModelAuthProfile: (profileId: string) => void;
+    cancelDeleteModelAuthProfile: () => void;
     handleStartSetupWizard: (mode: "local" | "remote") => Promise<void>;
     handleStartProviderAuth: (provider?: string) => Promise<void>;
     handleSubmitSetupWizard: () => Promise<void>;

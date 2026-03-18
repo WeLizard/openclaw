@@ -20,9 +20,9 @@ import {
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
 import { resolveUserPath } from "../utils.js";
+import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 import { resolveSetupSecretInputString } from "./setup.secret-input.js";
 import type { QuickstartGatewayDefaults, WizardFlow } from "./setup.types.js";
-import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 
 async function requireRiskAcknowledgement(params: {
   opts: OnboardOptions;
@@ -74,106 +74,18 @@ async function requireRiskAcknowledgement(params: {
   }
 }
 
-async function runProviderAuthWizard(
-  opts: OnboardOptions,
-  runtime: RuntimeEnv,
-  prompter: WizardPrompter,
-): Promise<boolean> {
-  if (opts.intent !== "models-auth-login" && !opts.provider) {
-    return false;
-  }
-
-  const snapshot = await readConfigFileSnapshot();
-  const baseConfig: OpenClawConfig = snapshot.valid ? snapshot.config : {};
-  if (snapshot.exists && !snapshot.valid) {
-    await prompter.note("Config is invalid. Fix it first, then re-run auth setup.", "Provider auth");
-    runtime.exit(1);
-    return true;
-  }
-
-  const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
-  const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
-  const {
-    finalizeCustomApiConfig,
-    promptCustomApiConfig,
-    resolveExistingCustomProviderContext,
-  } = await import("../commands/onboard-custom.js");
-  const { applyAuthChoice } = await import("../commands/auth-choice.js");
-  const { logConfigUpdated } = await import("../config/logging.js");
-
-  const authStore = ensureAuthProfileStore(undefined, {
-    allowKeychainPrompt: false,
-  });
-  let nextConfig = baseConfig;
-  const existingCustomProvider =
-    opts.provider && !opts.oauthOnly
-      ? resolveExistingCustomProviderContext(baseConfig, opts.provider)
-      : null;
-
-  if (existingCustomProvider) {
-    const customResult = await promptCustomApiConfig({
-      prompter,
-      runtime,
-      config: nextConfig,
-      secretInputMode: opts.secretInputMode,
-      initialBaseUrl: existingCustomProvider.baseUrl,
-      initialModelId: existingCustomProvider.modelId,
-      initialProviderId: existingCustomProvider.providerId,
-      initialCompatibility: existingCustomProvider.compatibility,
-    });
-    nextConfig = await finalizeCustomApiConfig({ result: customResult });
-  } else {
-    const authChoice = await promptAuthChoiceGrouped({
-      prompter,
-      store: authStore,
-      includeSkip: false,
-      provider: opts.provider,
-      oauthOnly: opts.oauthOnly,
-    });
-
-    if (authChoice === "custom-api-key") {
-      const customResult = await promptCustomApiConfig({
-        prompter,
-        runtime,
-        config: nextConfig,
-        secretInputMode: opts.secretInputMode,
-      });
-      nextConfig = await finalizeCustomApiConfig({ result: customResult });
-    } else {
-    const authResult = await applyAuthChoice({
-      authChoice,
-      config: nextConfig,
-      prompter,
-      runtime,
-      setDefaultModel: false,
-    });
-    nextConfig = authResult.config;
-    }
-  }
-
-  await writeConfigFile(nextConfig);
-  logConfigUpdated(runtime);
-  await prompter.outro("Auth setup complete.");
-  return true;
-}
-
-export async function runOnboardingWizard(
+export async function runSetupWizard(
   opts: OnboardOptions,
   runtime: RuntimeEnv = defaultRuntime,
   prompter: WizardPrompter,
 ) {
   const onboardHelpers = await import("../commands/onboard-helpers.js");
   onboardHelpers.printWizardHeader(runtime);
-  await prompter.intro(
-    opts.intent === "models-auth-login" || opts.provider ? "Provider auth" : "OpenClaw onboarding",
-  );
-  if (await runProviderAuthWizard(opts, runtime, prompter)) {
-    return;
-  }
+  await prompter.intro("OpenClaw setup");
   await requireRiskAcknowledgement({ opts, prompter });
 
   const snapshot = await readConfigFileSnapshot();
-  let baseConfig: OpenClawConfig = snapshot.valid ? snapshot.config : {};
+  let baseConfig: OpenClawConfig = snapshot.valid ? (snapshot.exists ? snapshot.config : {}) : {};
 
   if (snapshot.exists && !snapshot.valid) {
     await prompter.note(onboardHelpers.summarizeExistingConfig(baseConfig), "Invalid config");
@@ -188,7 +100,7 @@ export async function runOnboardingWizard(
       );
     }
     await prompter.outro(
-      `Config invalid. Run \`${formatCliCommand("openclaw doctor")}\` to repair it, then re-run onboarding.`,
+      `Config invalid. Run \`${formatCliCommand("openclaw doctor")}\` to repair it, then re-run setup.`,
     );
     runtime.exit(1);
     return;
@@ -235,7 +147,7 @@ export async function runOnboardingWizard(
   let flow: WizardFlow =
     explicitFlow ??
     (await prompter.select({
-      message: "Onboarding mode",
+      message: "Setup mode",
       options: [
         { value: "quickstart", label: "QuickStart", hint: quickstartHint },
         { value: "advanced", label: "Manual", hint: manualHint },
@@ -408,7 +320,7 @@ export async function runOnboardingWizard(
   } catch (error) {
     await prompter.note(
       [
-        "Could not resolve gateway.auth.token SecretRef for onboarding probe.",
+        "Could not resolve gateway.auth.token SecretRef for setup probe.",
         error instanceof Error ? error.message : String(error),
       ].join("\n"),
       "Gateway auth",
@@ -429,7 +341,7 @@ export async function runOnboardingWizard(
   } catch (error) {
     await prompter.note(
       [
-        "Could not resolve gateway.auth.password SecretRef for onboarding probe.",
+        "Could not resolve gateway.auth.password SecretRef for setup probe.",
         error instanceof Error ? error.message : String(error),
       ].join("\n"),
       "Gateway auth",
@@ -456,7 +368,7 @@ export async function runOnboardingWizard(
   } catch (error) {
     await prompter.note(
       [
-        "Could not resolve gateway.remote.token SecretRef for onboarding probe.",
+        "Could not resolve gateway.remote.token SecretRef for setup probe.",
         error instanceof Error ? error.message : String(error),
       ].join("\n"),
       "Gateway auth",
@@ -522,9 +434,9 @@ export async function runOnboardingWizard(
   const { applyLocalSetupWorkspaceConfig } = await import("../commands/onboard-config.js");
   let nextConfig: OpenClawConfig = applyLocalSetupWorkspaceConfig(baseConfig, workspaceDir);
 
-  const { ensureAuthProfileStore } = await import("../agents/auth-profiles.js");
+  const { ensureAuthProfileStore } = await import("../agents/auth-profiles.runtime.js");
   const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
-  const { finalizeCustomApiConfig, promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
   const { applyAuthChoice, resolvePreferredProviderForAuthChoice, warnIfModelConfigLooksOff } =
     await import("../commands/auth-choice.js");
   const { applyPrimaryModel, promptDefaultModel } = await import("../commands/model-picker.js");
@@ -539,6 +451,8 @@ export async function runOnboardingWizard(
       prompter,
       store: authStore,
       includeSkip: true,
+      config: nextConfig,
+      workspaceDir,
     }));
 
   if (authChoice === "custom-api-key") {
@@ -548,7 +462,7 @@ export async function runOnboardingWizard(
       config: nextConfig,
       secretInputMode: opts.secretInputMode,
     });
-    nextConfig = await finalizeCustomApiConfig({ result: customResult });
+    nextConfig = customResult.config;
   } else {
     const authResult = await applyAuthChoice({
       authChoice,
@@ -562,6 +476,10 @@ export async function runOnboardingWizard(
       },
     });
     nextConfig = authResult.config;
+
+    if (authResult.agentModelOverride) {
+      nextConfig = applyPrimaryModel(nextConfig, authResult.agentModelOverride);
+    }
   }
 
   if (authChoiceFromPrompt && authChoice !== "custom-api-key") {
@@ -570,8 +488,14 @@ export async function runOnboardingWizard(
       prompter,
       allowKeep: true,
       ignoreAllowlist: true,
-      includeVllm: true,
-      preferredProvider: resolvePreferredProviderForAuthChoice(authChoice),
+      includeProviderPluginSetups: true,
+      preferredProvider: await resolvePreferredProviderForAuthChoice({
+        choice: authChoice,
+        config: nextConfig,
+        workspaceDir,
+      }),
+      workspaceDir,
+      runtime,
     });
     if (modelSelection.config) {
       nextConfig = modelSelection.config;
@@ -664,5 +588,3 @@ export async function runOnboardingWizard(
     return;
   }
 }
-
-export const runSetupWizard = runOnboardingWizard;

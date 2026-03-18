@@ -156,8 +156,8 @@ async function executeModel(
       model: args.trim(),
     });
     const resolvedValue = resolveServerChatModelValue(
-      patched.resolved?.model ?? args.trim(),
-      patched.resolved?.modelProvider,
+      (patched.resolved?.model as string | undefined) ?? args.trim(),
+      patched.resolved?.modelProvider as string | undefined,
     );
     return {
       content: `Model set to \`${args.trim()}\`.`,

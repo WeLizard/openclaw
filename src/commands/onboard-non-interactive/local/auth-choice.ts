@@ -11,7 +11,6 @@ import { applyCloudflareAiGatewayConfig } from "../../onboard-auth.config-gatewa
 import {
   applyCustomApiConfig,
   CustomApiError,
-  finalizeCustomApiConfig,
   parseNonInteractiveCustomApiFlags,
   resolveCustomProviderId,
 } from "../../onboard-custom.js";
@@ -304,7 +303,7 @@ export async function applyNonInteractiveAuthChoice(params: {
           `Custom provider ID "${result.providerIdRenamedFrom}" already exists for a different base URL. Using "${result.providerId}".`,
         );
       }
-      return await finalizeCustomApiConfig({ result });
+      return result.config;
     } catch (err) {
       if (err instanceof CustomApiError) {
         switch (err.code) {

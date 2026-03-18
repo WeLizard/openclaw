@@ -1031,7 +1031,7 @@ export function renderConfig(props: ConfigProps) {
                         revealSensitive:
                           props.activeSection === "env" ? envSensitiveVisible : false,
                         isSensitivePathRevealed,
-                        onToggleSensitivePath: (path) => {
+                        onToggleSensitivePath: (path: Array<string | number>) => {
                           toggleSensitivePathReveal(path);
                           requestUpdate();
                         },

@@ -15,6 +15,17 @@ export type SessionsProps = {
   includeGlobal: boolean;
   includeUnknown: boolean;
   basePath: string;
+  searchQuery: string;
+  sortColumn: string;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+  actionsOpenKey: string | null;
+  onSearchChange: (q: string) => void;
+  onSortChange: (col: string, dir: "asc" | "desc") => void;
+  onPageChange: (p: number) => void;
+  onPageSizeChange: (s: number) => void;
+  onActionsOpenChange: (key: string | null) => void;
   onFiltersChange: (next: {
     activeMinutes: string;
     limit: string;
@@ -33,7 +44,7 @@ export type SessionsProps = {
     },
   ) => void;
   onDelete: (key: string) => void;
-  modelSuggestions: string[];
+  modelSuggestions?: string[];
 };
 
 const THINK_LEVELS = ["", "off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -234,7 +245,7 @@ export function renderSessions(props: SessionsProps) {
               )
         }
       </div>
-      ${renderSuggestionList("sessions-model-suggestions", props.modelSuggestions)}
+      ${renderSuggestionList("sessions-model-suggestions", props.modelSuggestions ?? [])}
     </section>
   `;
 }

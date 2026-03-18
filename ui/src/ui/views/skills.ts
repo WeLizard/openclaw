@@ -12,6 +12,7 @@ import {
 } from "./skills-shared.ts";
 
 export type SkillsProps = {
+  connected: boolean;
   loading: boolean;
   report: SkillStatusReport | null;
   error: string | null;

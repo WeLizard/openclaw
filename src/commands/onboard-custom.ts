@@ -1,6 +1,7 @@
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
-import { DEFAULT_CONTEXT_TOKENS, DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { buildModelAliasIndex, modelKey } from "../agents/model-selection.js";
+import { OLLAMA_DEFAULT_BASE_URL } from "../agents/ollama-defaults.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ModelProviderConfig } from "../config/types.models.js";
 import { isSecretRef, type SecretInput } from "../config/types.secrets.js";
@@ -14,38 +15,15 @@ import type { WizardPrompter } from "../wizard/prompts.js";
 import { ensureApiKeyFromEnvOrPrompt } from "./auth-choice.apply-helpers.js";
 import { applyPrimaryModel } from "./model-picker.js";
 import { normalizeAlias } from "./models/shared.js";
-import { applyAuthProfileConfig } from "./onboard-auth.config-core.js";
-import { setCustomProviderApiKey } from "./onboard-auth.credentials.js";
 import type { SecretInputMode } from "./onboard-types.js";
 
-const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
-const LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW = CONTEXT_WINDOW_HARD_MIN_TOKENS;
-const DEFAULT_CONTEXT_WINDOW = DEFAULT_CONTEXT_TOKENS;
-const LEGACY_CUSTOM_PROVIDER_MAX_TOKENS = 4096;
-const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_CONTEXT_WINDOW = CONTEXT_WINDOW_HARD_MIN_TOKENS;
+const DEFAULT_MAX_TOKENS = 4096;
 const VERIFY_TIMEOUT_MS = 30_000;
 
 function normalizeContextWindowForCustomModel(value: unknown): number {
   const parsed = typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : 0;
-  if (parsed <= 0) {
-    return DEFAULT_CONTEXT_WINDOW;
-  }
-  if (parsed === LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW) {
-    return DEFAULT_CONTEXT_WINDOW;
-  }
   return parsed >= CONTEXT_WINDOW_HARD_MIN_TOKENS ? parsed : CONTEXT_WINDOW_HARD_MIN_TOKENS;
-}
-
-function normalizeMaxTokensForCustomModel(value: unknown, contextWindow: number): number {
-  const parsed = typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : 0;
-  const fallback = Math.min(DEFAULT_MAX_TOKENS, contextWindow);
-  if (parsed <= 0) {
-    return fallback;
-  }
-  if (parsed === LEGACY_CUSTOM_PROVIDER_MAX_TOKENS && contextWindow > LEGACY_CUSTOM_PROVIDER_CONTEXT_WINDOW) {
-    return fallback;
-  }
-  return Math.min(parsed, contextWindow);
 }
 
 /**
@@ -90,11 +68,6 @@ export type CustomApiResult = {
   providerId?: string;
   modelId?: string;
   providerIdRenamedFrom?: string;
-  authProfile?: {
-    profileId: string;
-    provider: string;
-    apiKey: SecretInput;
-  };
 };
 
 export type ApplyCustomApiConfigParams = {
@@ -105,13 +78,6 @@ export type ApplyCustomApiConfigParams = {
   apiKey?: SecretInput;
   providerId?: string;
   alias?: string;
-};
-
-export type ExistingCustomProviderContext = {
-  providerId: string;
-  baseUrl: string;
-  modelId: string;
-  compatibility: CustomApiCompatibility;
 };
 
 export type ParseNonInteractiveCustomApiFlagsParams = {
@@ -199,43 +165,6 @@ function buildEndpointIdFromUrl(baseUrl: string): string {
   } catch {
     return "custom";
   }
-}
-
-function resolveCustomCompatibilityFromApi(
-  api: ModelProviderConfig["api"],
-): CustomApiCompatibility | null {
-  if (api === "anthropic-messages") {
-    return "anthropic";
-  }
-  if (api === "openai-completions") {
-    return "openai";
-  }
-  return null;
-}
-
-export function resolveExistingCustomProviderContext(
-  config: OpenClawConfig,
-  providerId: string,
-): ExistingCustomProviderContext | null {
-  const normalizedProviderId = normalizeEndpointId(providerId);
-  if (!normalizedProviderId) {
-    return null;
-  }
-  const provider = config.models?.providers?.[normalizedProviderId];
-  if (!provider?.baseUrl || !Array.isArray(provider.models) || provider.models.length === 0) {
-    return null;
-  }
-  const compatibility = resolveCustomCompatibilityFromApi(provider.api);
-  const modelId = provider.models[0]?.id?.trim();
-  if (!compatibility || !modelId) {
-    return null;
-  }
-  return {
-    providerId: normalizedProviderId,
-    baseUrl: provider.baseUrl,
-    modelId,
-    compatibility,
-  };
 }
 
 function resolveUniqueEndpointId(params: {
@@ -460,7 +389,7 @@ async function promptBaseUrlAndKey(params: {
 }): Promise<{ baseUrl: string; apiKey?: SecretInput; resolvedApiKey: string }> {
   const baseUrlInput = await params.prompter.text({
     message: "API Base URL",
-    initialValue: params.initialBaseUrl ?? DEFAULT_OLLAMA_BASE_URL,
+    initialValue: params.initialBaseUrl ?? OLLAMA_DEFAULT_BASE_URL,
     placeholder: "https://api.example.com/v1",
     validate: (val) => {
       try {
@@ -507,14 +436,10 @@ async function promptCustomApiRetryChoice(prompter: WizardPrompter): Promise<Cus
   });
 }
 
-async function promptCustomApiModelId(
-  prompter: WizardPrompter,
-  initialValue?: string,
-): Promise<string> {
+async function promptCustomApiModelId(prompter: WizardPrompter): Promise<string> {
   return (
     await prompter.text({
       message: "Model ID",
-      initialValue,
       placeholder: "e.g. llama3, claude-3-7-sonnet",
       validate: (val) => (val.trim() ? undefined : "Model ID is required"),
     })
@@ -623,49 +548,8 @@ export function parseNonInteractiveCustomApiFlags(
     modelId,
     compatibility: parseCustomApiCompatibility(params.compatibility),
     ...(apiKey ? { apiKey } : {}),
-  ...(providerId ? { providerId } : {}),
+    ...(providerId ? { providerId } : {}),
   };
-}
-
-export function stripInlineApiKeyFromProviderConfig(
-  cfg: OpenClawConfig,
-  providerId: string,
-): OpenClawConfig {
-  const providers = cfg.models?.providers;
-  const provider = providers?.[providerId];
-  if (!providers || !provider || !("apiKey" in provider)) {
-    return cfg;
-  }
-  const { apiKey: _apiKey, ...providerRest } = provider;
-  return {
-    ...cfg,
-    models: {
-      ...cfg.models,
-      providers: {
-        ...providers,
-        [providerId]: providerRest,
-      },
-    },
-  };
-}
-
-export async function finalizeCustomApiConfig(params: {
-  result: CustomApiResult;
-  agentDir?: string;
-}): Promise<OpenClawConfig> {
-  const authProfile = params.result.authProfile;
-  if (!authProfile) {
-    return params.result.config;
-  }
-
-  await setCustomProviderApiKey(authProfile.provider, authProfile.apiKey, params.agentDir);
-  let next = stripInlineApiKeyFromProviderConfig(params.result.config, authProfile.provider);
-  next = applyAuthProfileConfig(next, {
-    profileId: authProfile.profileId,
-    provider: authProfile.provider,
-    mode: "api_key",
-  });
-  return next;
 }
 
 export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): CustomApiResult {
@@ -723,17 +607,14 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
     reasoning: false,
   };
   const mergedModels = hasModel
-    ? existingModels.map((model) => {
-        if (model.id !== modelId) {
-          return model;
-        }
-        const contextWindow = normalizeContextWindowForCustomModel(model.contextWindow);
-        return {
-          ...model,
-          contextWindow,
-          maxTokens: normalizeMaxTokensForCustomModel(model.maxTokens, contextWindow),
-        };
-      })
+    ? existingModels.map((model) =>
+        model.id === modelId
+          ? {
+              ...model,
+              contextWindow: normalizeContextWindowForCustomModel(model.contextWindow),
+            }
+          : model,
+      )
     : [...existingModels, nextModel];
   const { apiKey: existingApiKey, ...existingProviderRest } = existingProvider ?? {};
   const normalizedApiKey =
@@ -782,15 +663,6 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
     config,
     providerId,
     modelId,
-    ...(normalizedApiKey
-      ? {
-          authProfile: {
-            profileId: `${providerId}:default`,
-            provider: providerId,
-            apiKey: normalizedApiKey,
-          },
-        }
-      : {}),
     ...(providerIdResult.providerIdRenamedFrom
       ? { providerIdRenamedFrom: providerIdResult.providerIdRenamedFrom }
       : {}),
@@ -802,11 +674,6 @@ export async function promptCustomApiConfig(params: {
   runtime: RuntimeEnv;
   config: OpenClawConfig;
   secretInputMode?: SecretInputMode;
-  initialBaseUrl?: string;
-  initialModelId?: string;
-  initialProviderId?: string;
-  initialCompatibility?: CustomApiCompatibility;
-  initialAlias?: string;
 }): Promise<CustomApiResult> {
   const { prompter, runtime, config } = params;
 
@@ -814,23 +681,21 @@ export async function promptCustomApiConfig(params: {
     prompter,
     config,
     secretInputMode: params.secretInputMode,
-    initialBaseUrl: params.initialBaseUrl,
   });
   let baseUrl = baseInput.baseUrl;
   let apiKey = baseInput.apiKey;
   let resolvedApiKey = baseInput.resolvedApiKey;
 
-  const compatibilityChoice = await prompter.select<CustomApiCompatibilityChoice>({
+  const compatibilityChoice = await prompter.select({
     message: "Endpoint compatibility",
     options: COMPATIBILITY_OPTIONS.map((option) => ({
       value: option.value,
       label: option.label,
       hint: option.hint,
     })),
-    initialValue: params.initialCompatibility ?? "unknown",
   });
 
-  let modelId = await promptCustomApiModelId(prompter, params.initialModelId);
+  let modelId = await promptCustomApiModelId(prompter);
 
   let compatibility: CustomApiCompatibility | null =
     compatibilityChoice === "unknown" ? null : compatibilityChoice;
@@ -909,8 +774,7 @@ export async function promptCustomApiConfig(params: {
   }
 
   const providers = config.models?.providers ?? {};
-  const suggestedId =
-    normalizeEndpointId(params.initialProviderId ?? "") || buildEndpointIdFromUrl(baseUrl);
+  const suggestedId = buildEndpointIdFromUrl(baseUrl);
   const providerIdInput = await prompter.text({
     message: "Endpoint ID",
     initialValue: suggestedId,
@@ -926,7 +790,7 @@ export async function promptCustomApiConfig(params: {
   const aliasInput = await prompter.text({
     message: "Model alias (optional)",
     placeholder: "e.g. local, ollama",
-    initialValue: params.initialAlias ?? "",
+    initialValue: "",
     validate: (value) => {
       const requestedId = normalizeEndpointId(providerIdInput) || "custom";
       const providerIdResult = resolveUniqueEndpointId({

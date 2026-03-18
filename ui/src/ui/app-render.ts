@@ -384,7 +384,7 @@ export function renderApp(state: AppViewState) {
     ${renderCommandPalette({
       open: state.paletteOpen,
       query: state.paletteQuery,
-      activeIndex: state.paletteActiveIndex,
+      activeIndex: state.paletteActiveIndex ?? 0,
       onToggle: () => {
         state.paletteOpen = !state.paletteOpen;
       },
@@ -764,23 +764,23 @@ export function renderApp(state: AppViewState) {
                     state.sessionsIncludeGlobal = next.includeGlobal;
                     state.sessionsIncludeUnknown = next.includeUnknown;
                   },
-                  onSearchChange: (q) => {
+                  onSearchChange: (q: string) => {
                     state.sessionsSearchQuery = q;
                     state.sessionsPage = 0;
                   },
-                  onSortChange: (col, dir) => {
+                  onSortChange: (col: string, dir: "asc" | "desc") => {
                     state.sessionsSortColumn = col;
                     state.sessionsSortDir = dir;
                     state.sessionsPage = 0;
                   },
-                  onPageChange: (p) => {
+                  onPageChange: (p: number) => {
                     state.sessionsPage = p;
                   },
-                  onPageSizeChange: (s) => {
+                  onPageSizeChange: (s: number) => {
                     state.sessionsPageSize = s;
                     state.sessionsPage = 0;
                   },
-                  onActionsOpenChange: (key) => {
+                  onActionsOpenChange: (key: string | null) => {
                     state.sessionsActionsOpenKey = key;
                   },
                   onRefresh: () => loadSessions(state),
@@ -1093,7 +1093,7 @@ export function renderApp(state: AppViewState) {
                   onConfigSave: () => saveAgentsConfig(state),
                   onChannelsRefresh: () => loadChannels(state, false),
                   onCronRefresh: () => state.loadCron(),
-                  onCronRunNow: (jobId) => {
+                  onCronRunNow: (jobId: string) => {
                     const job = state.cronJobs.find((entry) => entry.id === jobId);
                     if (!job) {
                       return;
@@ -1235,7 +1235,7 @@ export function renderApp(state: AppViewState) {
                     }
                     updateConfigFormValue(state, basePath, { primary, fallbacks: normalized });
                   },
-                  onSetDefault: (agentId) => {
+                  onSetDefault: (agentId: string) => {
                     if (!configValue) {
                       return;
                     }

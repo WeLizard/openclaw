@@ -6,7 +6,7 @@ import type {
   SessionsListResultBase,
   SessionsPatchResultBase,
 } from "../../../src/shared/session-types.js";
-export type { ConfigUiHints } from "../../../src/shared/config-ui-hints-types.js";
+export type { ConfigUiHint, ConfigUiHints } from "../../../src/shared/config-ui-hints-types.js";
 export type ModelCatalogEntry = import("../../../src/gateway/protocol/schema/types.js").ModelChoice;
 export type ChatModelOverride = import("./chat-model-ref.ts").ChatModelOverride;
 export type ModelsAuthStatusResult =
@@ -429,6 +429,8 @@ export type GatewaySessionRow = {
   model?: string;
   modelProvider?: string;
   contextTokens?: number;
+  spawnedBy?: string;
+  fastMode?: boolean;
 };
 
 export type SessionsListResult = SessionsListResultBase<GatewaySessionsDefaults, GatewaySessionRow>;
@@ -440,7 +442,9 @@ export type SessionsPatchResult = SessionsPatchResultBase<{
   verboseLevel?: string;
   reasoningLevel?: string;
   elevatedLevel?: string;
-}>;
+}> & {
+  resolved?: Record<string, unknown>;
+};
 
 export type {
   CostUsageDailyEntry,
@@ -625,6 +629,16 @@ export type SkillStatusReport = {
 };
 
 export type StatusSummary = Record<string, unknown>;
+
+export type HealthSummary = {
+  ok: boolean;
+  ts: number;
+  durationMs: number;
+  heartbeatSeconds: number;
+  defaultAgentId: string;
+  agents: unknown[];
+  sessions: { path: string; count: number; recent: unknown[] };
+};
 
 export type HealthSnapshot = Record<string, unknown>;
 

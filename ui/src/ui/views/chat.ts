@@ -44,6 +44,8 @@ export type ChatProps = {
   fallbackStatus?: FallbackIndicatorStatus | null;
   messages: unknown[];
   toolMessages: unknown[];
+  showToolCalls: boolean;
+  streamSegments: unknown[];
   stream: string | null;
   streamStartedAt: number | null;
   assistantAvatarUrl?: string | null;
@@ -81,7 +83,21 @@ export type ChatProps = {
   onCloseSidebar?: () => void;
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
+  getDraft?: () => string;
+  onRequestUpdate?: () => void;
+  onClearHistory?: () => void;
+  agentsList?: unknown;
+  currentAgentId?: string;
+  onAgentChange?: (agentId: string) => void;
+  onNavigateToAgent?: () => void;
+  onSessionSelect?: (key: string) => void;
+  basePath?: string;
 };
+
+/** Reset transient chat view state when navigating away from the chat tab. */
+export function resetChatViewState(): void {
+  // Intentionally empty — placeholder for future cleanup logic.
+}
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
 const FALLBACK_TOAST_DURATION_MS = 8000;
