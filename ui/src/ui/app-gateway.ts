@@ -202,8 +202,12 @@ export function connectGateway(host: GatewayHost) {
       (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void loadAssistantIdentity(host as unknown as OpenClawApp);
-      void loadAgents(host as unknown as OpenClawApp);
-      void loadToolsCatalog(host as unknown as OpenClawApp);
+      void loadAgents(host as unknown as OpenClawApp).then(() => {
+        const agentId = (host as unknown as OpenClawApp).agentsSelectedId;
+        if (agentId) {
+          void loadToolsCatalog(host as unknown as OpenClawApp, agentId);
+        }
+      });
       void loadAvailableModels(host as unknown as OpenClawApp);
       void loadNodes(host as unknown as OpenClawApp, { quiet: true });
       void loadDevices(host as unknown as OpenClawApp, { quiet: true });

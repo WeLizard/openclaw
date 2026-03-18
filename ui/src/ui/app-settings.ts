@@ -189,7 +189,13 @@ export async function refreshActiveTab(host: SettingsHost) {
   }
   if (host.tab === "agents") {
     await loadAgents(host as unknown as OpenClawApp);
-    await loadToolsCatalog(host as unknown as OpenClawApp);
+    const toolsAgentId =
+      (host as unknown as OpenClawApp).agentsSelectedId ??
+      (host as unknown as OpenClawApp).agentsList?.defaultId ??
+      (host as unknown as OpenClawApp).agentsList?.agents?.[0]?.id;
+    if (toolsAgentId) {
+      await loadToolsCatalog(host as unknown as OpenClawApp, toolsAgentId);
+    }
     await loadConfig(host as unknown as OpenClawApp);
     const agentIds = host.agentsList?.agents?.map((entry) => entry.id) ?? [];
     if (agentIds.length > 0) {
