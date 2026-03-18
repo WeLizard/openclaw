@@ -270,6 +270,10 @@ export class OpenClawApp extends LitElement {
   @state() sessionsHideCron = true;
   @state() availableModelsLoading = false;
   @state() availableModels: ModelCatalogEntry[] = [];
+  @state() attentionItems: import("./types.ts").AttentionItem[] = [];
+  @state() overviewShowGatewayToken = false;
+  @state() overviewShowGatewayPassword = false;
+  @state() overviewLogLines: string[] = [];
   @state() modelAuthLoading = false;
   @state() modelAuthBusyKey: string | null = null;
   @state() modelAuthError: string | null = null;
