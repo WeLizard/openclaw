@@ -39,6 +39,8 @@ export const ru: TranslationMap = {
     na: "н/д",
     docs: "Документация",
     resources: "Ресурсы",
+    search: "Поиск",
+    online: "Онлайн",
   },
   nav: {
     chat: "Чат",
@@ -215,6 +217,43 @@ export const ru: TranslationMap = {
       hint: "Эта страница HTTP, поэтому браузер блокирует идентификацию устройства. Используйте HTTPS (Tailscale Serve) или откройте {url} на хосте шлюза.",
       stayHttp: "Если вы должны остаться на HTTP, установите {config} (только токен).",
     },
+    connection: {
+      title: "Как подключиться",
+      step1: "Запустите шлюз на хост-машине:",
+      step2: "Получите URL панели с токеном:",
+      step3: "Вставьте URL WebSocket и токен выше, или откройте URL с токеном напрямую.",
+      step4: "Или сгенерируйте многоразовый токен:",
+      docsHint: "Для удалённого доступа рекомендуем Tailscale Serve. ",
+      docsLink: "Читать документацию →",
+    },
+    cards: {
+      cost: "Стоимость",
+      skills: "Навыки",
+      recentSessions: "Последние сессии",
+    },
+    attention: {
+      title: "Внимание",
+    },
+    eventLog: {
+      title: "Журнал событий",
+    },
+    logTail: {
+      title: "Логи шлюза",
+    },
+    quickActions: {
+      newSession: "Новая сессия",
+      automation: "Автоматизация",
+      refreshAll: "Обновить всё",
+      terminal: "Терминал",
+    },
+    palette: {
+      placeholder: "Введите команду…",
+      noResults: "Нет результатов",
+    },
+  },
+  login: {
+    subtitle: "Панель управления шлюзом",
+    passwordPlaceholder: "необязательно",
   },
   chat: {
     disconnected: "Отключено от шлюза.",
