@@ -238,6 +238,31 @@ function resolveAliasedParamValue(
   return seen ? resolved : undefined;
 }
 
+/**
+ * Strip empty `tools: []` from the payload before it reaches the API.
+ * Some OpenAI-compatible providers (e.g. qwen-portal) reject requests with
+ * `"tools": []` — the spec expects either a non-empty array or the field to be
+ * absent entirely.
+ */
+function createEmptyToolsGuardWrapper(baseStreamFn: StreamFn | undefined): StreamFn {
+  const underlying = baseStreamFn ?? streamSimple;
+  return (model, context, options) => {
+    const originalOnPayload = options?.onPayload;
+    return underlying(model, context, {
+      ...options,
+      onPayload: (payload) => {
+        if (payload && typeof payload === "object") {
+          const p = payload as Record<string, unknown>;
+          if (Array.isArray(p.tools) && p.tools.length === 0) {
+            delete p.tools;
+          }
+        }
+        return originalOnPayload?.(payload, model);
+      },
+    });
+  };
+}
+
 function createParallelToolCallsWrapper(
   baseStreamFn: StreamFn | undefined,
   enabled: boolean,
@@ -433,4 +458,8 @@ export function applyExtraParamsToAgent(
       log.warn(`ignoring invalid parallel_tool_calls param: ${summary}`);
     }
   }
+
+  // Guard against empty tools arrays — some OpenAI-compatible providers
+  // (e.g. qwen-portal) reject `"tools": []` with 400 "[] is too short".
+  agent.streamFn = createEmptyToolsGuardWrapper(agent.streamFn);
 }
