@@ -224,6 +224,7 @@ function renderMessageImages(images: ImageBlock[]) {
   `;
 }
 
+/** Render tool cards inside a collapsed `<details>` element. */
 function renderCollapsedToolCards(
   toolCards: ToolCard[],
   onOpenSidebar?: (content: string) => void,

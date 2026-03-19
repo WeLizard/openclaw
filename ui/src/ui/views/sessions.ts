@@ -341,7 +341,6 @@ export function renderSessions(props: SessionsProps) {
             />
           </div>
         </div>
-
         <div class="data-table-container">
           <table class="data-table">
             <thead>

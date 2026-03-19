@@ -124,6 +124,7 @@ describe("loadSettings default gateway URL derivation", () => {
     expect(sessionStorage.getItem("openclaw.control.token.v1:wss://gateway.example:8443/openclaw")).toBe(
       "persisted-token",
     );
+    const scopedKey = "openclaw.control.settings.v1:wss://gateway.example:8443/openclaw";
     const expectedPersistedSettings = {
       gatewayUrl: "wss://gateway.example:8443/openclaw",
       theme: "claw",
@@ -143,6 +144,7 @@ describe("loadSettings default gateway URL derivation", () => {
         },
       },
     };
+    expect(JSON.parse(localStorage.getItem(scopedKey) ?? "{}")).toEqual(expectedPersistedSettings);
     expect(
       JSON.parse(
         localStorage.getItem("openclaw.control.settings.v1:wss://gateway.example:8443/openclaw") ??
