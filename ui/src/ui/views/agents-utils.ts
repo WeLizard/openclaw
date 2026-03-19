@@ -1,157 +1,19 @@
 import { html } from "lit";
+import { t } from "../../i18n/index.ts";
+import {
+  listCoreToolSections,
+  PROFILE_OPTIONS as TOOL_PROFILE_OPTIONS,
+} from "../../../../src/agents/tool-catalog.js";
 import {
   expandToolGroups,
   normalizeToolName,
   resolveToolProfilePolicy,
 } from "../../../../src/agents/tool-policy-shared.js";
-import type {
-  AgentIdentityResult,
-  AgentsFilesListResult,
-  AgentsListResult,
-  ToolCatalogProfile,
-  ToolsCatalogResult,
-} from "../types.ts";
+import type { AgentIdentityResult, AgentsFilesListResult, AgentsListResult } from "../types.ts";
 
-export type AgentToolEntry = {
-  id: string;
-  label: string;
-  description: string;
-  source?: "core" | "plugin";
-  pluginId?: string;
-  optional?: boolean;
-  defaultProfiles?: string[];
-};
+export const TOOL_SECTIONS = listCoreToolSections();
 
-export type AgentToolSection = {
-  id: string;
-  label: string;
-  source?: "core" | "plugin";
-  pluginId?: string;
-  tools: AgentToolEntry[];
-};
-
-export const FALLBACK_TOOL_SECTIONS: AgentToolSection[] = [
-  {
-    id: "fs",
-    label: "Files",
-    tools: [
-      { id: "read", label: "read", description: "Read file contents" },
-      { id: "write", label: "write", description: "Create or overwrite files" },
-      { id: "edit", label: "edit", description: "Make precise edits" },
-      { id: "apply_patch", label: "apply_patch", description: "Patch files (OpenAI)" },
-    ],
-  },
-  {
-    id: "runtime",
-    label: "Runtime",
-    tools: [
-      { id: "exec", label: "exec", description: "Run shell commands" },
-      { id: "process", label: "process", description: "Manage background processes" },
-    ],
-  },
-  {
-    id: "web",
-    label: "Web",
-    tools: [
-      { id: "web_search", label: "web_search", description: "Search the web" },
-      { id: "web_fetch", label: "web_fetch", description: "Fetch web content" },
-    ],
-  },
-  {
-    id: "memory",
-    label: "Memory",
-    tools: [
-      { id: "memory_search", label: "memory_search", description: "Semantic search" },
-      { id: "memory_get", label: "memory_get", description: "Read memory files" },
-    ],
-  },
-  {
-    id: "sessions",
-    label: "Sessions",
-    tools: [
-      { id: "sessions_list", label: "sessions_list", description: "List sessions" },
-      { id: "sessions_history", label: "sessions_history", description: "Session history" },
-      { id: "sessions_send", label: "sessions_send", description: "Send to session" },
-      { id: "sessions_spawn", label: "sessions_spawn", description: "Spawn sub-agent" },
-      { id: "session_status", label: "session_status", description: "Session status" },
-    ],
-  },
-  {
-    id: "ui",
-    label: "UI",
-    tools: [
-      { id: "browser", label: "browser", description: "Control web browser" },
-      { id: "canvas", label: "canvas", description: "Control canvases" },
-    ],
-  },
-  {
-    id: "messaging",
-    label: "Messaging",
-    tools: [{ id: "message", label: "message", description: "Send messages" }],
-  },
-  {
-    id: "automation",
-    label: "Automation",
-    tools: [
-      { id: "cron", label: "cron", description: "Schedule tasks" },
-      { id: "gateway", label: "gateway", description: "Gateway control" },
-    ],
-  },
-  {
-    id: "nodes",
-    label: "Nodes",
-    tools: [{ id: "nodes", label: "nodes", description: "Nodes + devices" }],
-  },
-  {
-    id: "agents",
-    label: "Agents",
-    tools: [{ id: "agents_list", label: "agents_list", description: "List agents" }],
-  },
-  {
-    id: "media",
-    label: "Media",
-    tools: [{ id: "image", label: "image", description: "Image understanding" }],
-  },
-];
-
-export const PROFILE_OPTIONS = [
-  { id: "minimal", label: "Minimal" },
-  { id: "coding", label: "Coding" },
-  { id: "messaging", label: "Messaging" },
-  { id: "full", label: "Full" },
-] as const;
-
-export function resolveToolSections(
-  toolsCatalogResult: ToolsCatalogResult | null,
-): AgentToolSection[] {
-  if (toolsCatalogResult?.groups?.length) {
-    return toolsCatalogResult.groups.map((group) => ({
-      id: group.id,
-      label: group.label,
-      source: group.source,
-      pluginId: group.pluginId,
-      tools: group.tools.map((tool) => ({
-        id: tool.id,
-        label: tool.label,
-        description: tool.description,
-        source: tool.source,
-        pluginId: tool.pluginId,
-        optional: tool.optional,
-        defaultProfiles: [...tool.defaultProfiles],
-      })),
-    }));
-  }
-  return FALLBACK_TOOL_SECTIONS;
-}
-
-export function resolveToolProfileOptions(
-  toolsCatalogResult: ToolsCatalogResult | null,
-): readonly ToolCatalogProfile[] | typeof PROFILE_OPTIONS {
-  if (toolsCatalogResult?.profiles?.length) {
-    return toolsCatalogResult.profiles;
-  }
-  return PROFILE_OPTIONS;
-}
+export const PROFILE_OPTIONS = TOOL_PROFILE_OPTIONS;
 
 type ToolPolicy = {
   allow?: string[];
@@ -192,33 +54,6 @@ export function normalizeAgentLabel(agent: {
   identity?: { name?: string };
 }) {
   return agent.name?.trim() || agent.identity?.name?.trim() || agent.id;
-}
-
-const AVATAR_URL_RE = /^(https?:\/\/|data:image\/|\/)/i;
-
-export function resolveAgentAvatarUrl(
-  agent: { identity?: { avatar?: string; avatarUrl?: string } },
-  agentIdentity?: AgentIdentityResult | null,
-): string | null {
-  const candidates = [
-    agentIdentity?.avatar?.trim(),
-    agent.identity?.avatarUrl?.trim(),
-    agent.identity?.avatar?.trim(),
-  ];
-  for (const candidate of candidates) {
-    if (!candidate) {
-      continue;
-    }
-    if (AVATAR_URL_RE.test(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-export function agentLogoUrl(basePath: string): string {
-  const base = basePath?.trim() ? basePath.replace(/\/$/, "") : "";
-  return base ? `${base}/favicon.svg` : "favicon.svg";
 }
 
 function isLikelyEmoji(value: string) {
@@ -269,15 +104,7 @@ export function resolveAgentEmoji(
 }
 
 export function agentBadgeText(agentId: string, defaultId: string | null) {
-  return defaultId && agentId === defaultId ? "default" : null;
-}
-
-export function agentAvatarHue(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  }
-  return ((hash % 360) + 360) % 360;
+  return defaultId && agentId === defaultId ? t("agentsPage.badges.default") : null;
 }
 
 export function formatBytes(bytes?: number) {
@@ -312,7 +139,7 @@ export type AgentContext = {
   workspace: string;
   model: string;
   identityName: string;
-  identityAvatar: string;
+  identityEmoji: string;
   skillsLabel: string;
   isDefault: boolean;
 };
@@ -328,7 +155,10 @@ export function buildAgentContext(
   const workspaceFromFiles =
     agentFilesList && agentFilesList.agentId === agent.id ? agentFilesList.workspace : null;
   const workspace =
-    workspaceFromFiles || config.entry?.workspace || config.defaults?.workspace || "default";
+    workspaceFromFiles ||
+    config.entry?.workspace ||
+    config.defaults?.workspace ||
+    t("agentsPage.defaultWorkspace");
   const modelLabel = config.entry?.model
     ? resolveModelLabel(config.entry?.model)
     : resolveModelLabel(config.defaults?.model);
@@ -338,15 +168,17 @@ export function buildAgentContext(
     agent.name?.trim() ||
     config.entry?.name ||
     agent.id;
-  const identityAvatar = resolveAgentAvatarUrl(agent, agentIdentity) ? "custom" : "—";
+  const identityEmoji = resolveAgentEmoji(agent, agentIdentity) || "-";
   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
   const skillCount = skillFilter?.length ?? null;
   return {
     workspace,
     model: modelLabel,
     identityName,
-    identityAvatar,
-    skillsLabel: skillFilter ? `${skillCount} selected` : "all skills",
+    identityEmoji,
+    skillsLabel: skillFilter
+      ? t("agentsPage.skills.selectedCount", { count: String(skillCount) })
+      : t("agentsPage.skills.all"),
     isDefault: Boolean(defaultId && agent.id === defaultId),
   };
 }
@@ -363,15 +195,15 @@ export function resolveModelLabel(model?: unknown): string {
     const primary = record.primary?.trim();
     if (primary) {
       const fallbackCount = Array.isArray(record.fallbacks) ? record.fallbacks.length : 0;
-      return fallbackCount > 0 ? `${primary} (+${fallbackCount} fallback)` : primary;
+      return fallbackCount > 0
+        ? t("agentsPage.model.withFallbacks", {
+            model: primary,
+            count: String(fallbackCount),
+          })
+        : primary;
     }
   }
   return "-";
-}
-
-export function normalizeModelValue(label: string): string {
-  const match = label.match(/^(.+) \(\+\d+ fallback\)$/);
-  return match ? match[1] : label;
 }
 
 export function resolveModelPrimary(model?: unknown): string | null {
@@ -398,6 +230,15 @@ export function resolveModelPrimary(model?: unknown): string | null {
     return primary || null;
   }
   return null;
+}
+
+/**
+ * Normalise a raw model identifier string for display / comparison.
+ * Returns a trimmed, non-empty string or `null`.
+ */
+export function normalizeModelValue(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim();
+  return trimmed || null;
 }
 
 export function resolveModelFallbacks(model?: unknown): string[] | null {
@@ -578,11 +419,14 @@ export function buildModelOptions(
   const options = resolveConfiguredModels(configForm);
   const hasCurrent = current ? options.some((option) => option.value === current) : false;
   if (current && !hasCurrent) {
-    options.unshift({ value: current, label: `Current (${current})` });
+    options.unshift({
+      value: current,
+      label: t("agentsPage.model.current", { value: current }),
+    });
   }
   if (options.length === 0) {
     return html`
-      <option value="" disabled>No configured models</option>
+      <option value="" disabled>${t("agentsPage.model.noConfigured")}</option>
     `;
   }
   return options.map((option) => html`<option value=${option.value}>${option.label}</option>`);
@@ -673,4 +517,9 @@ export function matchesList(name: string, list?: string[]) {
 
 export function resolveToolProfile(profile: string) {
   return resolveToolProfilePolicy(profile) ?? undefined;
+}
+
+export function agentLogoUrl(basePath: string): string {
+  const prefix = basePath && basePath !== "/" ? basePath.replace(/\/+$/, "") + "/" : "";
+  return `${prefix}favicon.svg`;
 }

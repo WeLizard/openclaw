@@ -1049,7 +1049,7 @@ Prunes **old tool results** from in-memory context before sending to the LLM. Do
   agents: {
     defaults: {
       contextPruning: {
-        mode: "cache-ttl", // off | cache-ttl
+        mode: "cache-ttl", // off | cache-ttl | always
         ttl: "1h", // duration (ms/s/m/h), default unit: minutes
         keepLastAssistants: 3,
         softTrimRatio: 0.3,
@@ -1082,7 +1082,112 @@ Notes:
 
 </Accordion>
 
+<Accordion title="always mode behavior">
+
+- `mode: "always"` runs pruning checks on every request (no TTL gate).
+- Works with any provider/model, including non-cache-aware providers.
+- `ttl` is ignored in this mode.
+- Soft-trim and hard-clear behavior is the same as `cache-ttl`.
+
+</Accordion>
+
 See [Session Pruning](/concepts/session-pruning) for behavior details.
+
+### `agents.defaults.llmRetry`
+
+Optional retry/backoff policy for transient prompt failures (for example `429`, gateway timeouts, or short network drops).
+
+```json5
+{
+  agents: {
+    defaults: {
+      llmRetry: {
+        attempts: 3,
+        minDelayMs: 500,
+        maxDelayMs: 8000,
+        jitter: 0.1,
+      },
+    },
+  },
+}
+```
+
+- Retries run only for transient failures (`rate_limit`/`timeout`) and stop on auth/billing/format errors.
+- If a stream already started emitting assistant/tool output, OpenClaw does not retry that prompt.
+- `Retry-After` headers are honored when provided by the upstream API.
+- Default is disabled (`attempts: 1`).
+
+### `agents.defaults.semanticCache`
+
+In-memory response cache for repeated prompts (query-fingerprinting style optimization).
+
+```json5
+{
+  agents: {
+    defaults: {
+      semanticCache: {
+        mode: "semantic", // off | exact | semantic
+        ttl: "10m",
+        maxEntries: 64,
+        minPromptChars: 12,
+        minSimilarity: 0.9,
+        cacheActions: false,
+      },
+    },
+  },
+}
+```
+
+- `exact`: hit only on exact normalized prompt match.
+- `semantic`: hit on token-overlap similarity (`minSimilarity` threshold).
+- Cache is per session key and kept in memory (clears on restart).
+- By default, imperative/action prompts are excluded (`cacheActions: false`) to avoid replaying stale action confirmations.
+
+### `agents.defaults.tokenOptimization`
+
+Hierarchical token-efficiency controls for request routing, prompt planning hints, and input structuring.
+
+```json5
+{
+  agents: {
+    defaults: {
+      tokenOptimization: {
+        cascade: {
+          mode: "auto", // off | auto
+          cheapModel: "qwen/qwen3-8b",
+          simplePromptChars: 220,
+          complexPromptChars: 900,
+          simpleScoreThreshold: 2.5,
+        },
+        planner: {
+          mode: "auto", // off | auto | always
+          batching: true,
+          decomposition: true,
+          decomposeScoreThreshold: 4,
+          maxSubtasks: 8,
+        },
+        inputStructuring: {
+          enabled: true,
+          collapseWhitespace: true,
+          dedupeLines: true,
+          parseStateLines: true,
+          minStateLines: 5,
+        },
+      },
+    },
+  },
+}
+```
+
+- `cascade` implements Tier-3/Tier-4 routing:
+  - simple requests can be routed to `cheapModel` (Tier-3),
+  - complex requests stay on your primary model (Tier-4).
+- `planner` injects compact planning hints to reduce multi-step/tool-loop churn:
+  - batch related actions in one turn,
+  - decompose complex asks into explicit subtasks.
+- `inputStructuring` trims noisy prompts:
+  - collapses whitespace and repeated lines,
+  - packs dense `entity_id: value` state dumps into a compact snapshot block.
 
 ### Block streaming
 

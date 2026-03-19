@@ -227,26 +227,84 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     cronEnabled: null,
     cronNext: null,
     lastChannelsRefresh: null,
-    usageResult: null,
-    sessionsResult: null,
-    skillsReport: null,
-    cronJobs: [],
-    cronStatus: null,
-    attentionItems: [],
-    eventLog: [],
-    overviewLogLines: [],
-    showGatewayToken: false,
-    showGatewayPassword: false,
+    modelAuthLoading: false,
+    modelAuthBusyKey: null,
+    modelAuthError: null,
+    modelAuthStatus: null,
+    modelAuthDeleteConfirmProfileId: null,
+    wizardOpen: false,
+    wizardLoading: false,
+    wizardBusy: false,
     onSettingsChange: () => undefined,
     onPasswordChange: () => undefined,
     onSessionKeyChange: () => undefined,
-    onToggleGatewayTokenVisibility: () => undefined,
-    onToggleGatewayPasswordVisibility: () => undefined,
     onConnect: () => undefined,
     onRefresh: () => undefined,
-    onNavigate: () => undefined,
-    onRefreshLogs: () => undefined,
+    onModelAuthRefresh: () => undefined,
+    onPromoteProfile: () => undefined,
+    onClearProviderOrder: () => undefined,
+    onClearProfileCooldown: () => undefined,
+    onDisableProfile: () => undefined,
+    onEnableProfile: () => undefined,
+    onRequestDeleteProfile: () => undefined,
+    onCancelDeleteProfile: () => undefined,
+    onDeleteProfile: () => undefined,
+    onStartProviderAuth: () => undefined,
+    onStartWizard: () => undefined,
     ...overrides,
+  };
+}
+
+function createModelAuthStatus(): NonNullable<OverviewProps["modelAuthStatus"]> {
+  return {
+    ts: Date.now(),
+    path: "/config/.openclaw/agents/main/agent/auth-profiles.json",
+    agentId: "main",
+    agentDir: "/config/.openclaw/agents/main/agent",
+    providers: [
+      {
+        provider: "cliproxy",
+        status: "ok",
+        inUse: true,
+        effective: {
+          kind: "profiles",
+          detail: "/config/.openclaw/agents/main/agent/auth-profiles.json",
+        },
+        counts: {
+          total: 1,
+          oauth: 0,
+          token: 0,
+          apiKey: 1,
+          available: 1,
+          unavailable: 0,
+        },
+        activeProfileId: "cliproxy:default",
+        lastGoodProfileId: null,
+        storedOrder: null,
+        configuredOrder: null,
+        currentOrder: ["cliproxy:default"],
+        orderSource: "derived",
+        hasStoredOrderOverride: false,
+        profiles: [
+          {
+            profileId: "cliproxy:default",
+            label: "cliproxy:default",
+            provider: "cliproxy",
+            type: "api_key",
+            healthStatus: "ok",
+            unusableKind: "available",
+            unusableRemainingMs: null,
+            disabledReason: null,
+            remainingMs: null,
+            inStoredOrder: false,
+            isCurrent: true,
+            isLastGood: false,
+            lastUsed: null,
+            errorCount: 0,
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -373,6 +431,59 @@ describe("chat view", () => {
     expect(select?.selectedOptions[0]?.textContent?.trim()).toBe("简体中文 (简体中文)");
 
     await i18n.setLocale("en");
+  });
+
+  it("renders inline delete confirmation for auth profiles", async () => {
+    const container = document.createElement("div");
+    await i18n.setLocale("en");
+    render(
+      renderOverview(
+        createOverviewProps({
+          connected: true,
+          modelAuthStatus: createModelAuthStatus(),
+          modelAuthDeleteConfirmProfileId: "cliproxy:default",
+        }),
+      ),
+      container,
+    );
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>("button")];
+    expect(buttons.some((button) => button.textContent?.trim() === "Confirm delete")).toBe(true);
+    expect(buttons.some((button) => button.textContent?.trim() === "Cancel")).toBe(true);
+    expect(
+      buttons.some(
+        (button) =>
+          button.classList.contains("danger") && button.textContent?.trim() === "Delete profile",
+      ),
+    ).toBe(false);
+  });
+
+  it("adds explanatory tooltips for disabled account-card actions", async () => {
+    const container = document.createElement("div");
+    await i18n.setLocale("en");
+    render(
+      renderOverview(
+        createOverviewProps({
+          connected: true,
+          modelAuthStatus: createModelAuthStatus(),
+        }),
+      ),
+      container,
+    );
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>("button")];
+    const makePrimaryButton = buttons.find(
+      (button) => button.textContent?.trim() === "Make primary",
+    );
+    const resetOrderButton = buttons.find((button) => button.textContent?.trim() === "Reset order");
+
+    expect(makePrimaryButton).toBeDefined();
+    expect(makePrimaryButton?.disabled).toBe(true);
+    expect(makePrimaryButton?.title).toBe("This profile is already the active primary profile.");
+
+    expect(resetOrderButton).toBeDefined();
+    expect(resetOrderButton?.disabled).toBe(true);
+    expect(resetOrderButton?.title).toBe("There is no stored custom order to reset.");
   });
 
   it("renders compacting indicator as a badge", () => {

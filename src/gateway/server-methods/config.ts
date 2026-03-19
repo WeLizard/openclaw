@@ -1,8 +1,7 @@
-import { exec } from "node:child_process";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
 import {
-  createConfigIO,
+  CONFIG_PATH,
   loadConfig,
   parseConfigJson5,
   readConfigFileSnapshot,
@@ -11,7 +10,6 @@ import {
   validateConfigObjectWithPlugins,
   writeConfigFile,
 } from "../../config/config.js";
-import { formatConfigIssueLines } from "../../config/issue-format.js";
 import { applyLegacyMigrations } from "../../config/legacy.js";
 import { applyMergePatch } from "../../config/merge-patch.js";
 import {
@@ -21,11 +19,12 @@ import {
 } from "../../config/redact-snapshot.js";
 import {
   buildConfigSchema,
+  type ChannelUiMetadata,
   lookupConfigSchema,
   type ConfigSchemaResponse,
 } from "../../config/schema.js";
 import { extractDeliveryInfo } from "../../config/sessions.js";
-import type { ConfigValidationIssue, OpenClawConfig } from "../../config/types.openclaw.js";
+import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import {
   formatDoctorNonInteractiveHint,
   type RestartSentinelPayload,
@@ -33,6 +32,7 @@ import {
 } from "../../infra/restart-sentinel.js";
 import { scheduleGatewaySigusr1Restart } from "../../infra/restart.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
+import type { PluginRegistry } from "../../plugins/registry.js";
 import { diffConfigPaths } from "../config-reload.js";
 import {
   formatControlPlaneActor,
@@ -56,7 +56,58 @@ import { parseRestartRequestParams } from "./restart-request.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
-const MAX_CONFIG_ISSUES_IN_ERROR_MESSAGE = 3;
+type ChannelSchemaSource = {
+  id: string;
+  meta?: {
+    label?: string;
+    blurb?: string;
+  };
+  configSchema?: {
+    schema: Record<string, unknown>;
+    uiHints?: Record<string, unknown>;
+  };
+};
+
+function mergeChannelMetadata(
+  current: ChannelUiMetadata | undefined,
+  source: ChannelSchemaSource,
+): ChannelUiMetadata {
+  return {
+    id: source.id,
+    label: source.meta?.label?.trim() || current?.label,
+    description: source.meta?.blurb?.trim() || current?.description,
+    configSchema:
+      (source.configSchema?.schema as Record<string, unknown> | undefined) ?? current?.configSchema,
+    configUiHints:
+      (source.configSchema?.uiHints as ChannelUiMetadata["configUiHints"] | undefined) ??
+      current?.configUiHints,
+  };
+}
+
+export function collectChannelUiMetadata(params: {
+  pluginRegistry: PluginRegistry;
+  runtimeChannels?: ChannelSchemaSource[];
+}): ChannelUiMetadata[] {
+  const merged = new Map<string, ChannelUiMetadata>();
+
+  for (const entry of params.pluginRegistry.channels) {
+    const id = entry.plugin.id.trim();
+    if (!id) {
+      continue;
+    }
+    merged.set(id, mergeChannelMetadata(merged.get(id), entry.plugin));
+  }
+
+  for (const channel of params.runtimeChannels ?? []) {
+    const id = channel.id.trim();
+    if (!id) {
+      continue;
+    }
+    merged.set(id, mergeChannelMetadata(merged.get(id), channel));
+  }
+
+  return Array.from(merged.values());
+}
 
 function requireConfigBaseHash(
   params: unknown,
@@ -162,27 +213,13 @@ function parseValidateConfigFromRawOrRespond(
     respond(
       false,
       undefined,
-      errorShape(ErrorCodes.INVALID_REQUEST, summarizeConfigValidationIssues(validated.issues), {
+      errorShape(ErrorCodes.INVALID_REQUEST, "invalid config", {
         details: { issues: validated.issues },
       }),
     );
     return null;
   }
   return { config: validated.config, schema };
-}
-
-function summarizeConfigValidationIssues(issues: ReadonlyArray<ConfigValidationIssue>): string {
-  const trimmed = issues.slice(0, MAX_CONFIG_ISSUES_IN_ERROR_MESSAGE);
-  const lines = formatConfigIssueLines(trimmed, "", { normalizeRoot: true })
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length === 0) {
-    return "invalid config";
-  }
-  const hiddenCount = Math.max(0, issues.length - lines.length);
-  return `invalid config: ${lines.join("; ")}${
-    hiddenCount > 0 ? ` (+${hiddenCount} more issue${hiddenCount === 1 ? "" : "s"})` : ""
-  }`;
 }
 
 function resolveConfigRestartRequest(params: unknown): {
@@ -215,7 +252,6 @@ function buildConfigRestartSentinelPayload(params: {
   threadId: ReturnType<typeof extractDeliveryInfo>["threadId"];
   note: string | undefined;
 }): RestartSentinelPayload {
-  const configPath = createConfigIO().configPath;
   return {
     kind: params.kind,
     status: "ok",
@@ -227,7 +263,7 @@ function buildConfigRestartSentinelPayload(params: {
     doctorHint: formatDoctorNonInteractiveHint(),
     stats: {
       mode: params.mode,
-      root: configPath,
+      root: CONFIG_PATH,
     },
   };
 }
@@ -249,9 +285,6 @@ function loadSchemaWithPlugins(): ConfigSchemaResponse {
     config: cfg,
     cache: true,
     workspaceDir,
-    runtimeOptions: {
-      allowGatewaySubagentBinding: true,
-    },
     logger: {
       info: () => {},
       warn: () => {},
@@ -270,13 +303,17 @@ function loadSchemaWithPlugins(): ConfigSchemaResponse {
       configUiHints: plugin.configUiHints,
       configSchema: plugin.configJsonSchema,
     })),
-    channels: listChannelPlugins().map((entry) => ({
-      id: entry.id,
-      label: entry.meta.label,
-      description: entry.meta.blurb,
-      configSchema: entry.configSchema?.schema,
-      configUiHints: entry.configSchema?.uiHints,
-    })),
+    channels: collectChannelUiMetadata({
+      pluginRegistry,
+      runtimeChannels: listChannelPlugins().map((entry) => ({
+        id: entry.id,
+        meta: {
+          label: entry.meta.label,
+          blurb: entry.meta.blurb,
+        },
+        configSchema: entry.configSchema,
+      })),
+    }),
   });
 }
 
@@ -345,7 +382,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: createConfigIO().configPath,
+        path: CONFIG_PATH,
         config: redactConfigObject(parsed.config, parsed.schema.uiHints),
       },
       undefined,
@@ -419,7 +456,7 @@ export const configHandlers: GatewayRequestHandlers = {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, summarizeConfigValidationIssues(validated.issues), {
+        errorShape(ErrorCodes.INVALID_REQUEST, "invalid config", {
           details: { issues: validated.issues },
         }),
       );
@@ -462,7 +499,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: createConfigIO().configPath,
+        path: CONFIG_PATH,
         config: redactConfigObject(validated.config, schemaPatch.uiHints),
         restart,
         sentinel: {
@@ -522,7 +559,7 @@ export const configHandlers: GatewayRequestHandlers = {
       true,
       {
         ok: true,
-        path: createConfigIO().configPath,
+        path: CONFIG_PATH,
         config: redactConfigObject(parsed.config, parsed.schema.uiHints),
         restart,
         sentinel: {
@@ -532,20 +569,5 @@ export const configHandlers: GatewayRequestHandlers = {
       },
       undefined,
     );
-  },
-  "config.openFile": ({ params, respond }) => {
-    if (!assertValidParams(params, validateConfigGetParams, "config.openFile", respond)) {
-      return;
-    }
-    const configPath = createConfigIO().configPath;
-    const platform = process.platform;
-    const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
-    exec(`${cmd} ${JSON.stringify(configPath)}`, (err) => {
-      if (err) {
-        respond(true, { ok: false, path: configPath, error: err.message }, undefined);
-        return;
-      }
-      respond(true, { ok: true, path: configPath }, undefined);
-    });
   },
 };

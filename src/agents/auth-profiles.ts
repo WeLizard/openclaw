@@ -11,8 +11,10 @@ export { resolveAuthProfileEligibility, resolveAuthProfileOrder } from "./auth-p
 export { resolveAuthStorePathForDisplay } from "./auth-profiles/paths.js";
 export {
   dedupeProfileIds,
+  deleteAuthProfile,
   listProfilesForProvider,
   markAuthProfileGood,
+  setAuthProfileManualDisabled,
   setAuthProfileOrder,
   upsertAuthProfile,
   upsertAuthProfileWithLock,

@@ -105,6 +105,45 @@ function tokenSessionKeyForGateway(gatewayUrl: string): string {
   return `${TOKEN_SESSION_KEY_PREFIX}${normalizeGatewayTokenScope(gatewayUrl)}`;
 }
 
+function parsePersistedSettings(raw: string | null): PersistedUiSettings | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as PersistedUiSettings;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePersistedGatewayUrl(
+  parsed: PersistedUiSettings | null,
+  defaults: UiSettings,
+  pageDerivedUrl: string,
+): string {
+  const persistedGatewayUrl =
+    typeof parsed?.gatewayUrl === "string" && parsed.gatewayUrl.trim()
+      ? parsed.gatewayUrl.trim()
+      : defaults.gatewayUrl;
+  return persistedGatewayUrl === pageDerivedUrl ? defaults.gatewayUrl : persistedGatewayUrl;
+}
+
+function resolveLegacyPersistedToken(
+  parsed: PersistedUiSettings | null,
+  gatewayUrl: string,
+  defaults: UiSettings,
+  pageDerivedUrl: string,
+): string {
+  if (!parsed || !("token" in parsed) || typeof (parsed as { token?: unknown }).token !== "string") {
+    return "";
+  }
+  const legacyGatewayUrl = resolvePersistedGatewayUrl(parsed, defaults, pageDerivedUrl);
+  if (normalizeGatewayTokenScope(legacyGatewayUrl) !== normalizeGatewayTokenScope(gatewayUrl)) {
+    return "";
+  }
+  return (parsed as { token?: string }).token?.trim() ?? "";
+}
+
 function resolveScopedSessionSelection(
   gatewayUrl: string,
   parsed: PersistedUiSettings,
@@ -195,30 +234,37 @@ export function loadSettings(): UiSettings {
   };
 
   try {
-    // First check for legacy key (no scope), then check for scoped key
-    const scopedKey = settingsKeyForGateway(defaults.gatewayUrl);
-    const raw =
-      storage?.getItem(scopedKey) ??
-      storage?.getItem(SETTINGS_KEY_PREFIX + "default") ??
-      storage?.getItem(LEGACY_SETTINGS_KEY);
+    const legacyRaw = storage?.getItem("openclaw.control.settings.v1") ?? null;
+    const legacyParsed = parsePersistedSettings(legacyRaw);
+    const selectedGatewayUrl = resolvePersistedGatewayUrl(legacyParsed, defaults, pageDerivedUrl);
+    const scopedRaw = storage?.getItem(settingsKeyForGateway(selectedGatewayUrl)) ?? null;
+    const fallbackScopedRaw = storage?.getItem(SETTINGS_KEY_PREFIX + "default") ?? null;
+    const raw = scopedRaw ?? fallbackScopedRaw ?? legacyRaw;
     if (!raw) {
       return defaults;
     }
-    const parsed = JSON.parse(raw) as PersistedUiSettings;
-    const parsedGatewayUrl =
-      typeof parsed.gatewayUrl === "string" && parsed.gatewayUrl.trim()
-        ? parsed.gatewayUrl.trim()
-        : defaults.gatewayUrl;
-    const gatewayUrl = parsedGatewayUrl === pageDerivedUrl ? defaultUrl : parsedGatewayUrl;
+    const parsed = parsePersistedSettings(raw);
+    if (!parsed) {
+      return defaults;
+    }
+    const gatewayUrl = resolvePersistedGatewayUrl(parsed, defaults, pageDerivedUrl);
     const scopedSessionSelection = resolveScopedSessionSelection(gatewayUrl, parsed, defaults);
     const { theme, mode } = parseThemeSelection(
       (parsed as { theme?: unknown }).theme,
       (parsed as { themeMode?: unknown }).themeMode,
     );
+    const sessionToken = loadSessionToken(gatewayUrl);
+    const legacyToken = resolveLegacyPersistedToken(
+      legacyParsed,
+      gatewayUrl,
+      defaults,
+      pageDerivedUrl,
+    );
+    const resolvedToken = sessionToken || legacyToken;
     const settings = {
       gatewayUrl,
       // Gateway auth is intentionally in-memory only; scrub any legacy persisted token on load.
-      token: loadSessionToken(gatewayUrl),
+      token: resolvedToken,
       sessionKey: scopedSessionSelection.sessionKey,
       lastActiveSessionKey: scopedSessionSelection.lastActiveSessionKey,
       theme,
@@ -257,7 +303,10 @@ export function loadSettings(): UiSettings {
           : defaults.borderRadius,
       locale: isSupportedLocale(parsed.locale) ? parsed.locale : undefined,
     };
-    if ("token" in parsed) {
+    if (legacyToken) {
+      persistSessionToken(gatewayUrl, legacyToken);
+    }
+    if ("token" in parsed || legacyToken) {
       persistSettings(settings);
     }
     return settings;

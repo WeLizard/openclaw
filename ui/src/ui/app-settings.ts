@@ -10,14 +10,21 @@ import { scheduleChatScroll, scheduleLogsScroll } from "./app-scroll.ts";
 import type { OpenClawApp } from "./app.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
-import { loadAgents } from "./controllers/agents.ts";
+import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadConfig, loadConfigSchema } from "./controllers/config.ts";
-import { loadCronJobs, loadCronRuns, loadCronStatus } from "./controllers/cron.ts";
+import {
+  loadCronJobs,
+  loadCronModelSuggestions,
+  loadCronRuns,
+  loadCronStatus,
+} from "./controllers/cron.ts";
 import { loadDebug } from "./controllers/debug.ts";
 import { loadDevices } from "./controllers/devices.ts";
 import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
+import { loadModelAuthStatus } from "./controllers/model-auth.ts";
+import { loadAvailableModels } from "./controllers/model-catalog.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
@@ -246,6 +253,7 @@ export async function refreshActiveTab(host: SettingsHost) {
       host.agentsSelectedId ?? host.agentsList?.defaultId ?? host.agentsList?.agents?.[0]?.id;
     if (agentId) {
       void loadAgentIdentity(host as unknown as OpenClawApp, agentId);
+      void loadToolsCatalog(host as unknown as OpenClawApp, agentId);
       if (host.agentsPanel === "skills") {
         void loadAgentSkills(host as unknown as OpenClawApp, agentId);
       }
@@ -506,6 +514,8 @@ export async function loadOverview(host: SettingsHost) {
     loadSkills(app),
     loadUsage(app),
     loadOverviewLogs(app),
+    loadModelAuthStatus(app),
+    loadAvailableModels(app),
   ]);
   buildAttentionItems(app);
 }

@@ -39,7 +39,25 @@ function normalizeSchemaNode(
   const normalized: JsonSchema = { ...schema };
   const pathLabel = pathKey(path) || "<root>";
 
-  if (schema.anyOf || schema.oneOf || schema.allOf) {
+  if (path.length > 0 && isAnySchema(schema)) {
+    return {
+      schema: {
+        ...schema,
+        type: "string",
+      },
+      unsupportedPaths: [],
+    };
+  }
+
+  if (schema.allOf) {
+    const composed = normalizeAllOf(schema, path);
+    if (composed) {
+      return composed;
+    }
+    return { schema, unsupportedPaths: [pathLabel] };
+  }
+
+  if (schema.anyOf || schema.oneOf) {
     const union = normalizeUnion(schema, path);
     if (union) {
       return union;
@@ -87,8 +105,11 @@ function normalizeSchemaNode(
       if (!isAnySchema(schema.additionalProperties)) {
         const res = normalizeSchemaNode(schema.additionalProperties, [...path, "*"]);
         normalized.additionalProperties = res.schema ?? schema.additionalProperties;
-        if (res.unsupportedPaths.length > 0) {
+        if (!res.schema) {
           unsupported.add(pathLabel);
+        }
+        for (const entry of res.unsupportedPaths) {
+          unsupported.add(entry);
         }
       }
     }
@@ -99,8 +120,11 @@ function normalizeSchemaNode(
     } else {
       const res = normalizeSchemaNode(itemsSchema, [...path, "*"]);
       normalized.items = res.schema ?? itemsSchema;
-      if (res.unsupportedPaths.length > 0) {
+      if (!res.schema) {
         unsupported.add(pathLabel);
+      }
+      for (const entry of res.unsupportedPaths) {
+        unsupported.add(entry);
       }
     }
   } else if (
@@ -117,6 +141,94 @@ function normalizeSchemaNode(
     schema: normalized,
     unsupportedPaths: Array.from(unsupported),
   };
+}
+
+function mergeAdditionalProperties(
+  current: JsonSchema["additionalProperties"],
+  next: JsonSchema["additionalProperties"],
+): JsonSchema["additionalProperties"] {
+  if (next === undefined) {
+    return current;
+  }
+  if (current === undefined) {
+    return next;
+  }
+  if (current === false || next === false) {
+    return false;
+  }
+  if (current === true || next === true) {
+    return true;
+  }
+  return {
+    ...current,
+    ...next,
+    ...(current.properties || next.properties
+      ? { properties: { ...(current.properties ?? {}), ...(next.properties ?? {}) } }
+      : {}),
+  };
+}
+
+function normalizeAllOf(
+  schema: JsonSchema,
+  path: Array<string | number>,
+): ConfigSchemaAnalysis | null {
+  const segments = schema.allOf ?? [];
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const merged: JsonSchema = { ...schema, allOf: undefined };
+  const unsupported = new Set<string>();
+
+  for (const segment of segments) {
+    if (!segment || typeof segment !== "object") {
+      return null;
+    }
+    const res = normalizeSchemaNode(segment, path);
+    if (!res.schema) {
+      return null;
+    }
+    for (const entry of res.unsupportedPaths) {
+      unsupported.add(entry);
+    }
+
+    const segmentSchema = res.schema;
+    const mergedType = schemaType(merged);
+    const segmentType = schemaType(segmentSchema);
+    if (mergedType && segmentType && mergedType !== segmentType) {
+      return null;
+    }
+
+    merged.type = mergedType ?? segmentType ?? merged.type;
+    merged.nullable = Boolean(merged.nullable || segmentSchema.nullable);
+    merged.title = merged.title ?? segmentSchema.title;
+    merged.description = merged.description ?? segmentSchema.description;
+    merged.default = merged.default ?? segmentSchema.default;
+    if (segmentSchema.enum && !merged.enum) {
+      merged.enum = segmentSchema.enum;
+    }
+    if (segmentSchema.items && !merged.items) {
+      merged.items = segmentSchema.items;
+    }
+    if (segmentSchema.properties) {
+      merged.properties = {
+        ...(merged.properties ?? {}),
+        ...segmentSchema.properties,
+      };
+    }
+    merged.additionalProperties = mergeAdditionalProperties(
+      merged.additionalProperties,
+      segmentSchema.additionalProperties,
+    );
+  }
+
+  const normalized = normalizeSchemaNode(merged, path);
+  for (const entry of unsupported) {
+    if (!normalized.unsupportedPaths.includes(entry)) {
+      normalized.unsupportedPaths.push(entry);
+    }
+  }
+  return normalized;
 }
 
 function isSecretRefVariant(entry: JsonSchema): boolean {
@@ -271,6 +383,34 @@ function normalizeUnion(
         nullable,
       },
       unsupportedPaths: [],
+    };
+  }
+
+  const normalizedVariants = remaining
+    .map((entry) => {
+      const res = normalizeSchemaNode(entry, path);
+      if (!res.schema) {
+        return null;
+      }
+      return res;
+    })
+    .filter((entry): entry is ConfigSchemaAnalysis => Boolean(entry));
+  if (normalizedVariants.length === remaining.length && normalizedVariants.length > 1) {
+    const unsupportedPaths = new Set<string>();
+    for (const variant of normalizedVariants) {
+      for (const entry of variant.unsupportedPaths) {
+        unsupportedPaths.add(entry);
+      }
+    }
+    return {
+      schema: {
+        ...schema,
+        nullable,
+        anyOf: schema.anyOf ? normalizedVariants.map((variant) => variant.schema!) : undefined,
+        oneOf: schema.oneOf ? normalizedVariants.map((variant) => variant.schema!) : undefined,
+        allOf: undefined,
+      },
+      unsupportedPaths: Array.from(unsupportedPaths),
     };
   }
 

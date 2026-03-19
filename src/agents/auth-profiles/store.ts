@@ -61,6 +61,31 @@ function resolveRuntimeAuthProfileStore(agentDir?: string): AuthProfileStore | n
   return null;
 }
 
+function resolveRuntimeAuthProfileStoreForWrite(agentDir?: string): AuthProfileStore | null {
+  if (runtimeAuthStoreSnapshots.size === 0) {
+    return null;
+  }
+  const requestedStore = runtimeAuthStoreSnapshots.get(resolveRuntimeStoreKey(agentDir));
+  if (!requestedStore) {
+    return null;
+  }
+  return cloneAuthProfileStore(requestedStore);
+}
+
+function updateRuntimeAuthProfileStoreSnapshotIfPresent(
+  agentDir: string | undefined,
+  store: AuthProfileStore,
+): void {
+  if (runtimeAuthStoreSnapshots.size === 0) {
+    return;
+  }
+  const key = resolveRuntimeStoreKey(agentDir);
+  if (!runtimeAuthStoreSnapshots.has(key)) {
+    return;
+  }
+  runtimeAuthStoreSnapshots.set(key, cloneAuthProfileStore(store));
+}
+
 export function replaceRuntimeAuthProfileStoreSnapshots(
   entries: Array<{ agentDir?: string; store: AuthProfileStore }>,
 ): void {
@@ -86,12 +111,15 @@ export async function updateAuthProfileStoreWithLock(params: {
 
   try {
     return await withFileLock(authPath, AUTH_STORE_LOCK_OPTIONS, async () => {
-      const store = ensureAuthProfileStore(params.agentDir);
+      const store =
+        resolveRuntimeAuthProfileStoreForWrite(params.agentDir) ??
+        ensureAuthProfileStore(params.agentDir);
       const shouldSave = params.updater(store);
       if (shouldSave) {
         saveAuthProfileStore(store, params.agentDir);
+        updateRuntimeAuthProfileStoreSnapshotIfPresent(params.agentDir, store);
       }
-      return store;
+      return shouldSave ? store : null;
     });
   } catch {
     return null;

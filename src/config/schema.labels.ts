@@ -475,6 +475,36 @@ export const FIELD_LABELS: Record<string, string> = {
     "Compaction Memory Flush Transcript Size Threshold",
   "agents.defaults.compaction.memoryFlush.prompt": "Compaction Memory Flush Prompt",
   "agents.defaults.compaction.memoryFlush.systemPrompt": "Compaction Memory Flush System Prompt",
+  "agents.defaults.tokenOptimization": "Token Optimization",
+  "agents.defaults.tokenOptimization.cascade": "Token Optimization Cascade",
+  "agents.defaults.tokenOptimization.cascade.mode": "Cascade Mode",
+  "agents.defaults.tokenOptimization.cascade.cheapModel": "Cascade Cheap Model",
+  "agents.defaults.tokenOptimization.cascade.simplePromptChars":
+    "Cascade Simple Prompt Chars",
+  "agents.defaults.tokenOptimization.cascade.complexPromptChars":
+    "Cascade Complex Prompt Chars",
+  "agents.defaults.tokenOptimization.cascade.simpleScoreThreshold":
+    "Cascade Simple Score Threshold",
+  "agents.defaults.tokenOptimization.planner": "Token Optimization Planner",
+  "agents.defaults.tokenOptimization.planner.mode": "Planner Mode",
+  "agents.defaults.tokenOptimization.planner.batching": "Planner Batching",
+  "agents.defaults.tokenOptimization.planner.decomposition": "Planner Decomposition",
+  "agents.defaults.tokenOptimization.planner.decomposeScoreThreshold":
+    "Planner Decompose Score Threshold",
+  "agents.defaults.tokenOptimization.planner.maxSubtasks": "Planner Max Subtasks",
+  "agents.defaults.tokenOptimization.inputStructuring": "Input Structuring",
+  "agents.defaults.tokenOptimization.inputStructuring.enabled": "Input Structuring Enabled",
+  "agents.defaults.tokenOptimization.inputStructuring.collapseWhitespace":
+    "Input Collapse Whitespace",
+  "agents.defaults.tokenOptimization.inputStructuring.dedupeLines":
+    "Input Dedupe Repeated Lines",
+  "agents.defaults.tokenOptimization.inputStructuring.maxConsecutiveBlankLines":
+    "Input Max Consecutive Blank Lines",
+  "agents.defaults.tokenOptimization.inputStructuring.minDuplicateLineChars":
+    "Input Min Duplicate Line Length",
+  "agents.defaults.tokenOptimization.inputStructuring.parseStateLines":
+    "Input Parse State Lines",
+  "agents.defaults.tokenOptimization.inputStructuring.minStateLines": "Input Min State Lines",
   "agents.defaults.embeddedPi": "Embedded Pi",
   "agents.defaults.embeddedPi.projectSettingsPolicy": "Embedded Pi Project Settings Policy",
   "agents.defaults.heartbeat.directPolicy": "Heartbeat Direct Policy",

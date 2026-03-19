@@ -6,7 +6,11 @@ import { buildAgentSystemPrompt } from "../../system-prompt.js";
 import {
   buildAfterTurnRuntimeContext,
   composeSystemPromptWithHookContext,
+  computeLlmPromptRetryDelayMs,
+  resolveLlmPromptRetryConfig,
+  resolveLlmPromptRetryReason,
   isOllamaCompatProvider,
+  resolveRetryAfterMsFromError,
   prependSystemPromptAddition,
   resolveAttemptFsWorkspaceOnly,
   resolveOllamaCompatNumCtxEnabled,
@@ -258,6 +262,66 @@ describe("resolveAttemptFsWorkspaceOnly", () => {
         sessionAgentId: "main",
       }),
     ).toBe(false);
+  });
+});
+
+describe("llm prompt retry helpers", () => {
+  it("disables retries by default", () => {
+    const cfg = resolveLlmPromptRetryConfig(undefined);
+    expect(cfg.attempts).toBe(1);
+    expect(cfg.minDelayMs).toBeGreaterThan(0);
+    expect(cfg.maxDelayMs).toBeGreaterThanOrEqual(cfg.minDelayMs);
+  });
+
+  it("reads llmRetry config overrides", () => {
+    const cfg = resolveLlmPromptRetryConfig({
+      agents: {
+        defaults: {
+          llmRetry: {
+            attempts: 4,
+            minDelayMs: 250,
+            maxDelayMs: 2_000,
+            jitter: 0,
+          },
+        },
+      },
+    });
+    expect(cfg).toEqual({
+      attempts: 4,
+      minDelayMs: 250,
+      maxDelayMs: 2_000,
+      jitter: 0,
+    });
+  });
+
+  it("classifies retryable reasons from provider errors", () => {
+    expect(resolveLlmPromptRetryReason({ status: 429 })).toBe("rate_limit");
+    expect(resolveLlmPromptRetryReason({ code: "ETIMEDOUT" })).toBe("timeout");
+    expect(resolveLlmPromptRetryReason({ status: 401 })).toBeNull();
+  });
+
+  it("extracts Retry-After from headers", () => {
+    const retryAfterMs = resolveRetryAfterMsFromError({
+      response: {
+        headers: {
+          "retry-after": "2",
+        },
+      },
+    });
+    expect(retryAfterMs).toBe(2_000);
+  });
+
+  it("computes exponential backoff delay", () => {
+    const delay = computeLlmPromptRetryDelayMs({
+      config: {
+        attempts: 3,
+        minDelayMs: 200,
+        maxDelayMs: 10_000,
+        jitter: 0,
+      },
+      attempt: 2,
+    });
+    expect(delay).toBe(400);
   });
 });
 describe("wrapStreamFnTrimToolCallNames", () => {

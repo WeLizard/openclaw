@@ -1,12 +1,17 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
-import { OLLAMA_DEFAULT_BASE_URL } from "../agents/ollama-defaults.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../agents/defaults.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { defaultRuntime } from "../runtime.js";
 import {
   applyCustomApiConfig,
+  finalizeCustomApiConfig,
   parseNonInteractiveCustomApiFlags,
   promptCustomApiConfig,
+  resolveExistingCustomProviderContext,
 } from "./onboard-custom.js";
 
 // Mock dependencies
@@ -134,21 +139,71 @@ describe("promptCustomApiConfig", () => {
     expect(result.config.agents?.defaults?.models?.["custom/llama3"]?.alias).toBe("local");
   });
 
-  it("defaults custom setup to the native Ollama base URL", async () => {
+  it("prefills existing custom provider values when supplied", async () => {
     const prompter = createTestPrompter({
-      text: ["http://localhost:11434", "", "llama3", "custom", ""],
+      text: ["http://192.168.0.52:8317/v1", "", "gpt-5.4", "cliproxy", ""],
       select: ["plaintext", "openai"],
     });
     stubFetchSequence([{ ok: true }]);
 
-    await runPromptCustomApi(prompter);
+    await promptCustomApiConfig({
+      prompter: prompter as unknown as Parameters<typeof promptCustomApiConfig>[0]["prompter"],
+      runtime: { ...defaultRuntime, log: vi.fn() },
+      config: {},
+      initialBaseUrl: "http://192.168.0.52:8317/v1",
+      initialModelId: "gpt-5.4",
+      initialProviderId: "cliproxy",
+      initialCompatibility: "openai",
+    });
 
-    expect(prompter.text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: "API Base URL",
-        initialValue: OLLAMA_DEFAULT_BASE_URL,
-      }),
+    expect(prompter.text).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ message: "API Base URL", initialValue: "http://192.168.0.52:8317/v1" }),
     );
+    expect(prompter.select).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ message: "Endpoint compatibility", initialValue: "openai" }),
+    );
+    expect(prompter.text).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Model ID", initialValue: "gpt-5.4" }),
+    );
+    expect(prompter.text).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Endpoint ID", initialValue: "cliproxy" }),
+    );
+  });
+
+  it("finalizes custom provider into auth-profiles and strips inline apiKey", async () => {
+    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-custom-provider-auth-"));
+    try {
+      const result = applyCustomApiConfig({
+        config: {},
+        baseUrl: "http://192.168.0.52:8317/v1",
+        modelId: "gpt-5.4",
+        compatibility: "openai",
+        apiKey: "my-dev-key",
+        providerId: "cliproxy",
+        alias: "gpt-5.4",
+      });
+
+      const finalized = await finalizeCustomApiConfig({ result, agentDir });
+      const authStorePath = path.join(agentDir, "auth-profiles.json");
+      const authStore = JSON.parse(await fs.readFile(authStorePath, "utf8")) as {
+        profiles?: Record<string, { type?: string; provider?: string; key?: string }>;
+      };
+
+      expect(authStore.profiles?.["cliproxy:default"]).toMatchObject({
+        type: "api_key",
+        provider: "cliproxy",
+        key: "my-dev-key",
+      });
+      expect(finalized.auth?.profiles?.["cliproxy:default"]).toMatchObject({
+        provider: "cliproxy",
+        mode: "api_key",
+      });
+      expect(finalized.models?.providers?.cliproxy?.apiKey).toBeUndefined();
+    } finally {
+      await fs.rm(agentDir, { recursive: true, force: true });
+    }
   });
 
   it("retries when verification fails", async () => {
@@ -385,14 +440,19 @@ describe("promptCustomApiConfig", () => {
 describe("applyCustomApiConfig", () => {
   it.each([
     {
-      name: "uses hard-min context window for newly added custom models",
+      name: "uses catalog-style default context window for newly added custom models",
       existingContextWindow: undefined,
-      expectedContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+      expectedContextWindow: DEFAULT_CONTEXT_TOKENS,
     },
     {
       name: "upgrades existing custom model context window when below hard minimum",
       existingContextWindow: 4096,
       expectedContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+    },
+    {
+      name: "upgrades legacy custom model context window when it still uses the old 16k default",
+      existingContextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+      expectedContextWindow: DEFAULT_CONTEXT_TOKENS,
     },
     {
       name: "preserves existing custom model context window when already above minimum",
@@ -405,6 +465,42 @@ describe("applyCustomApiConfig", () => {
       (entry) => entry.id === "foo-large",
     );
     expect(model?.contextWindow).toBe(expectedContextWindow);
+  });
+
+  it("upgrades legacy custom model maxTokens when the old 4k default is paired with an upgraded context window", () => {
+    const result = applyCustomApiConfig({
+      config: {
+        models: {
+          providers: {
+            custom: {
+              api: "openai-completions",
+              baseUrl: "https://llm.example.com/v1",
+              models: [
+                {
+                  id: "foo-large",
+                  name: "foo-large",
+                  contextWindow: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+                  maxTokens: 4096,
+                  input: ["text"],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  reasoning: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+      baseUrl: "https://llm.example.com/v1",
+      modelId: "foo-large",
+      compatibility: "openai",
+      providerId: "custom",
+    });
+
+    const model = result.config.models?.providers?.custom?.models?.find(
+      (entry) => entry.id === "foo-large",
+    );
+    expect(model?.contextWindow).toBe(DEFAULT_CONTEXT_TOKENS);
+    expect(model?.maxTokens).toBe(8192);
   });
 
   it.each([
@@ -434,6 +530,42 @@ describe("applyCustomApiConfig", () => {
   });
 });
 
+describe("resolveExistingCustomProviderContext", () => {
+  it("detects an existing OpenAI-compatible custom provider", () => {
+    const result = resolveExistingCustomProviderContext(
+      {
+        models: {
+          providers: {
+            cliproxy: {
+              baseUrl: "http://192.168.0.52:8317/v1",
+              api: "openai-completions",
+              models: [
+                {
+                  id: "gpt-5.4",
+                  name: "GPT-5.4",
+                  contextWindow: 200000,
+                  maxTokens: 16384,
+                  input: ["text"],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  reasoning: true,
+                },
+              ],
+            },
+          },
+        },
+      },
+      "cliproxy",
+    );
+
+    expect(result).toEqual({
+      providerId: "cliproxy",
+      baseUrl: "http://192.168.0.52:8317/v1",
+      modelId: "gpt-5.4",
+      compatibility: "openai",
+    });
+  });
+});
+
 describe("parseNonInteractiveCustomApiFlags", () => {
   it("parses required flags and defaults compatibility to openai", () => {
     const result = parseNonInteractiveCustomApiFlags({
@@ -447,7 +579,7 @@ describe("parseNonInteractiveCustomApiFlags", () => {
       baseUrl: "https://llm.example.com/v1",
       modelId: "foo-large",
       compatibility: "openai",
-      apiKey: "custom-test-key", // pragma: allowlist secret
+      apiKey: "custom-test-key",
       providerId: "my-custom",
     });
   });

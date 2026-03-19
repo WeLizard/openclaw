@@ -1060,6 +1060,48 @@ export const FIELD_HELP: Record<string, string> = {
     "User-prompt template used for the pre-compaction memory flush turn when generating memory candidates. Use this only when you need custom extraction instructions beyond the default memory flush behavior.",
   "agents.defaults.compaction.memoryFlush.systemPrompt":
     "System-prompt override for the pre-compaction memory flush turn to control extraction style and safety constraints. Use carefully so custom instructions do not reduce memory quality or leak sensitive context.",
+  "agents.defaults.tokenOptimization":
+    "Hierarchical token-efficiency controls combining cascade routing, planning hints, and input structuring. Use this when you want to reduce API cost by routing simple asks to cheaper models and reducing prompt noise.",
+  "agents.defaults.tokenOptimization.cascade":
+    "Tiered request routing settings. In auto mode, simple prompts can be routed to a cheaper model while complex prompts remain on the primary model.",
+  "agents.defaults.tokenOptimization.cascade.mode":
+    'Cascade router mode: "off" disables tiered routing, "auto" enables simple-request routing to cheapModel when configured.',
+  "agents.defaults.tokenOptimization.cascade.cheapModel":
+    "Optional Tier-3 model reference (provider/model) used for simple requests when cascade mode is auto.",
+  "agents.defaults.tokenOptimization.cascade.simplePromptChars":
+    "Maximum prompt length considered a simple request candidate for Tier-3 routing.",
+  "agents.defaults.tokenOptimization.cascade.complexPromptChars":
+    "Prompt length threshold that forces Tier-4 (primary model) routing for complex requests.",
+  "agents.defaults.tokenOptimization.cascade.simpleScoreThreshold":
+    "Maximum complexity score allowed for Tier-3 routing in auto mode.",
+  "agents.defaults.tokenOptimization.planner":
+    "Prompt planner hints that encourage batching related actions and decomposition of complex goals to reduce tool-loop churn.",
+  "agents.defaults.tokenOptimization.planner.mode":
+    'Planner mode: "off" disables hints, "auto" injects hints only when detected, "always" injects hints for every request.',
+  "agents.defaults.tokenOptimization.planner.batching":
+    "When enabled, planner hints encourage combining related actions into one execution plan.",
+  "agents.defaults.tokenOptimization.planner.decomposition":
+    "When enabled, planner hints encourage decomposing complex goals into explicit subtasks first.",
+  "agents.defaults.tokenOptimization.planner.decomposeScoreThreshold":
+    "Complexity score threshold used by planner auto mode to trigger decomposition hints.",
+  "agents.defaults.tokenOptimization.planner.maxSubtasks":
+    "Upper bound suggested by planner hints for generated subtask count.",
+  "agents.defaults.tokenOptimization.inputStructuring":
+    "Input normalization controls for collapsing noisy prompt text, deduplicating repeated lines, and packing dense state dumps.",
+  "agents.defaults.tokenOptimization.inputStructuring.enabled":
+    "Master switch for input structuring before model submission.",
+  "agents.defaults.tokenOptimization.inputStructuring.collapseWhitespace":
+    "Collapse repeated whitespace and blank-line runs in prompts to reduce token bloat.",
+  "agents.defaults.tokenOptimization.inputStructuring.dedupeLines":
+    "Remove consecutive duplicate lines above a minimum length to reduce repeated context.",
+  "agents.defaults.tokenOptimization.inputStructuring.maxConsecutiveBlankLines":
+    "Maximum blank lines preserved in a row when whitespace collapsing is enabled.",
+  "agents.defaults.tokenOptimization.inputStructuring.minDuplicateLineChars":
+    "Minimum line length eligible for consecutive duplicate-line removal.",
+  "agents.defaults.tokenOptimization.inputStructuring.parseStateLines":
+    "Detect dense Home Assistant-like `entity_id: value` lines and pack them into a compact snapshot block.",
+  "agents.defaults.tokenOptimization.inputStructuring.minStateLines":
+    "Minimum detected state lines required before packing into a snapshot block.",
   "agents.defaults.embeddedPi":
     "Embedded Pi runner hardening controls for how workspace-local Pi settings are trusted and applied in OpenClaw sessions.",
   "agents.defaults.embeddedPi.projectSettingsPolicy":

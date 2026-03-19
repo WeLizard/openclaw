@@ -406,7 +406,7 @@ function setMergedSchemaCache(key: string, value: ConfigSchemaResponse): void {
   mergedSchemaCache.set(key, value);
 }
 
-function stripChannelSchema(schema: ConfigSchema): ConfigSchema {
+function stripControlUiOnlyFields(schema: ConfigSchema): ConfigSchema {
   const next = cloneSchema(schema);
   const root = asSchemaObject(next);
   if (!root || !root.properties) {
@@ -417,12 +417,6 @@ function stripChannelSchema(schema: ConfigSchema): ConfigSchema {
   delete root.properties.$schema;
   if (Array.isArray(root.required)) {
     root.required = root.required.filter((key) => key !== "$schema");
-  }
-  const channelsNode = asSchemaObject(root.properties.channels);
-  if (channelsNode) {
-    channelsNode.properties = {};
-    channelsNode.required = [];
-    channelsNode.additionalProperties = true;
   }
   return next;
 }
@@ -438,7 +432,7 @@ function buildBaseConfigSchema(): ConfigSchemaResponse {
   schema.title = "OpenClawConfig";
   const hints = applyDerivedTags(mapSensitivePaths(OpenClawSchema, "", buildBaseHints()));
   const next = {
-    schema: stripChannelSchema(schema),
+    schema: stripControlUiOnlyFields(schema),
     uiHints: hints,
     version: VERSION,
     generatedAt: new Date().toISOString(),

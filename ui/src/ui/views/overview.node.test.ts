@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectErrorDetailCodes } from "../../../../src/gateway/protocol/connect-error-details.js";
-import { resolveAuthHintKind, shouldShowPairingHint } from "./overview-hints.ts";
+import { shouldShowPairingHint } from "./overview-hints.ts";
+import type { ModelsAuthProviderStatus } from "../types.ts";
 
 describe("shouldShowPairingHint", () => {
   it("returns true for 'pairing required' close reason", () => {
@@ -38,52 +39,74 @@ describe("shouldShowPairingHint", () => {
   });
 });
 
-describe("resolveAuthHintKind", () => {
-  it("returns required for structured auth-required codes", () => {
-    expect(
-      resolveAuthHintKind({
-        connected: false,
-        lastError: "disconnected (4008): connect failed",
-        lastErrorCode: ConnectErrorDetailCodes.AUTH_TOKEN_MISSING,
-        hasToken: false,
-        hasPassword: false,
-      }),
-    ).toBe("required");
+describe("resolveDisplayedProviderStatus", () => {
+  let resolveDisplayedProviderStatus: typeof import("./overview.ts").resolveDisplayedProviderStatus;
+
+  beforeEach(async () => {
+    const storage = {
+      getItem: () => "en",
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    };
+    vi.stubGlobal("localStorage", storage);
+    ({ resolveDisplayedProviderStatus } = await import("./overview.ts"));
   });
 
-  it("returns failed for structured auth mismatch codes", () => {
-    expect(
-      resolveAuthHintKind({
-        connected: false,
-        lastError: "disconnected (4008): connect failed",
-        lastErrorCode: ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH,
-        hasToken: true,
-        hasPassword: false,
-      }),
-    ).toBe("failed");
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
-  it("does not treat generic connect failures as auth failures", () => {
-    expect(
-      resolveAuthHintKind({
-        connected: false,
-        lastError: "disconnected (4008): connect failed",
-        lastErrorCode: ConnectErrorDetailCodes.CONTROL_UI_DEVICE_IDENTITY_REQUIRED,
-        hasToken: true,
-        hasPassword: false,
-      }),
-    ).toBeNull();
+  it("treats profile-backed API key providers as healthy in the UI", () => {
+    const entry = {
+      provider: "cliproxy",
+      status: "static",
+      inUse: true,
+      effective: { kind: "profiles", detail: "/config/.openclaw/agents/main/agent/auth-profiles.json" },
+      counts: { total: 1, oauth: 0, token: 0, apiKey: 1, available: 1, unavailable: 0 },
+      activeProfileId: "cliproxy:default",
+      lastGoodProfileId: null,
+      storedOrder: null,
+      configuredOrder: null,
+      currentOrder: ["cliproxy:default"],
+      orderSource: "derived",
+      hasStoredOrderOverride: false,
+      profiles: [
+        {
+          profileId: "cliproxy:default",
+          label: "cliproxy:default",
+          provider: "cliproxy",
+          type: "api_key",
+          healthStatus: "static",
+          unusableKind: "available",
+          inStoredOrder: false,
+          isCurrent: true,
+          isLastGood: false,
+        },
+      ],
+    } satisfies ModelsAuthProviderStatus;
+
+    expect(resolveDisplayedProviderStatus(entry)).toBe("ok");
   });
 
-  it("falls back to unauthorized string matching without structured codes", () => {
-    expect(
-      resolveAuthHintKind({
-        connected: false,
-        lastError: "disconnected (4008): unauthorized",
-        lastErrorCode: null,
-        hasToken: true,
-        hasPassword: false,
-      }),
-    ).toBe("failed");
+  it("keeps legacy static providers marked as static", () => {
+    const entry = {
+      provider: "legacy",
+      status: "static",
+      inUse: false,
+      effective: { kind: "models.json", detail: "/config/.openclaw/agents/main/agent/models.json" },
+      counts: { total: 0, oauth: 0, token: 0, apiKey: 0, available: 0, unavailable: 0 },
+      activeProfileId: null,
+      lastGoodProfileId: null,
+      storedOrder: null,
+      configuredOrder: null,
+      currentOrder: [],
+      orderSource: "derived",
+      hasStoredOrderOverride: false,
+      profiles: [],
+    } satisfies ModelsAuthProviderStatus;
+
+    expect(resolveDisplayedProviderStatus(entry)).toBe("static");
   });
 });

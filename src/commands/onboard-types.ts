@@ -97,6 +97,10 @@ export type OnboardOptions = {
   mode?: OnboardMode;
   /** "manual" is an alias for "advanced". */
   flow?: "quickstart" | "advanced" | "manual";
+  intent?: "onboarding" | "models-auth-login";
+  provider?: string;
+  oauthOnly?: boolean;
+  locale?: string;
   workspace?: string;
   nonInteractive?: boolean;
   /** Required for non-interactive setup; skips the interactive risk prompt when true. */

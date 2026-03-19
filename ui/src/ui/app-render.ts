@@ -68,6 +68,7 @@ import {
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
+import { loadAvailableModels } from "./controllers/model-catalog.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
 import { deleteSessionAndRefresh, loadSessions, patchSession } from "./controllers/sessions.ts";
@@ -97,6 +98,7 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderLoginGate } from "./views/login-gate.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderSetupWizard } from "./views/setup-wizard.ts";
 
 // Lazy-loaded view modules – deferred so the initial bundle stays small.
 // Each loader resolves once; subsequent calls return the cached module.
@@ -384,7 +386,7 @@ export function renderApp(state: AppViewState) {
     ${renderCommandPalette({
       open: state.paletteOpen,
       query: state.paletteQuery,
-      activeIndex: state.paletteActiveIndex,
+      activeIndex: state.paletteActiveIndex ?? 0,
       onToggle: () => {
         state.paletteOpen = !state.paletteOpen;
       },
@@ -661,6 +663,29 @@ export function renderApp(state: AppViewState) {
                 onRefresh: () => state.loadOverview(),
                 onNavigate: (tab) => state.setTab(tab as import("./navigation.ts").Tab),
                 onRefreshLogs: () => state.loadOverview(),
+                modelAuthLoading: state.modelAuthLoading,
+                modelAuthBusyKey: state.modelAuthBusyKey,
+                modelAuthError: state.modelAuthError,
+                modelAuthStatus: state.modelAuthStatus,
+                modelAuthDeleteConfirmProfileId: state.modelAuthDeleteConfirmProfileId,
+                wizardOpen: state.wizardOpen,
+                wizardLoading: state.wizardLoading,
+                wizardBusy: state.wizardBusy,
+                onModelAuthRefresh: () => void state.handleLoadModelAuthStatus(),
+                onPromoteProfile: (provider, profileId) =>
+                  void state.handlePromoteModelAuthProfile(provider, profileId),
+                onClearProviderOrder: (provider) => void state.handleClearModelAuthOrder(provider),
+                onClearProfileCooldown: (profileId) =>
+                  void state.handleClearModelAuthCooldown(profileId),
+                onDisableProfile: (profileId) =>
+                  void state.handleDisableModelAuthProfile(profileId),
+                onEnableProfile: (profileId) => void state.handleEnableModelAuthProfile(profileId),
+                onRequestDeleteProfile: (profileId) =>
+                  state.requestDeleteModelAuthProfile(profileId),
+                onCancelDeleteProfile: () => state.cancelDeleteModelAuthProfile(),
+                onDeleteProfile: (profileId) => void state.handleDeleteModelAuthProfile(profileId),
+                onStartProviderAuth: (provider) => void state.handleStartProviderAuth(provider),
+                onStartWizard: (mode) => void state.handleStartSetupWizard(mode),
               })
             : nothing
         }
@@ -744,23 +769,23 @@ export function renderApp(state: AppViewState) {
                     state.sessionsIncludeGlobal = next.includeGlobal;
                     state.sessionsIncludeUnknown = next.includeUnknown;
                   },
-                  onSearchChange: (q) => {
+                  onSearchChange: (q: string) => {
                     state.sessionsSearchQuery = q;
                     state.sessionsPage = 0;
                   },
-                  onSortChange: (col, dir) => {
+                  onSortChange: (col: string, dir: "asc" | "desc") => {
                     state.sessionsSortColumn = col;
                     state.sessionsSortDir = dir;
                     state.sessionsPage = 0;
                   },
-                  onPageChange: (p) => {
+                  onPageChange: (p: number) => {
                     state.sessionsPage = p;
                   },
-                  onPageSizeChange: (s) => {
+                  onPageSizeChange: (s: number) => {
                     state.sessionsPageSize = s;
                     state.sessionsPage = 0;
                   },
-                  onActionsOpenChange: (key) => {
+                  onActionsOpenChange: (key: string | null) => {
                     state.sessionsActionsOpenKey = key;
                   },
                   onRefresh: () => loadSessions(state),
@@ -1081,7 +1106,7 @@ export function renderApp(state: AppViewState) {
                   onConfigSave: () => saveAgentsConfig(state),
                   onChannelsRefresh: () => loadChannels(state, false),
                   onCronRefresh: () => state.loadCron(),
-                  onCronRunNow: (jobId) => {
+                  onCronRunNow: (jobId: string) => {
                     const job = state.cronJobs.find((entry) => entry.id === jobId);
                     if (!job) {
                       return;
@@ -1223,7 +1248,7 @@ export function renderApp(state: AppViewState) {
                     }
                     updateConfigFormValue(state, basePath, { primary, fallbacks: normalized });
                   },
-                  onSetDefault: (agentId) => {
+                  onSetDefault: (agentId: string) => {
                     if (!configValue) {
                       return;
                     }
@@ -1944,7 +1969,7 @@ export function renderApp(state: AppViewState) {
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
-      ${nothing}
+      ${renderSetupWizard(state)}
     </div>
   `;
 }

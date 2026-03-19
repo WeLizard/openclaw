@@ -11,6 +11,7 @@ import {
   BlockStreamingCoalesceSchema,
   CliBackendSchema,
   HumanDelaySchema,
+  RetryConfigSchema,
   TypingModeSchema,
 } from "./zod-schema.core.js";
 
@@ -52,9 +53,58 @@ export const AgentDefaultsSchema = z
     contextTokens: z.number().int().positive().optional(),
     cliBackends: z.record(z.string(), CliBackendSchema).optional(),
     memorySearch: MemorySearchSchema,
+    semanticCache: z
+      .object({
+        mode: z.union([z.literal("off"), z.literal("exact"), z.literal("semantic")]).optional(),
+        ttl: z.string().optional(),
+        maxEntries: z.number().int().positive().optional(),
+        minPromptChars: z.number().int().positive().optional(),
+        minSimilarity: z.number().min(0).max(1).optional(),
+        cacheActions: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
+    tokenOptimization: z
+      .object({
+        cascade: z
+          .object({
+            mode: z.union([z.literal("off"), z.literal("auto")]).optional(),
+            cheapModel: z.string().optional(),
+            simplePromptChars: z.number().int().positive().optional(),
+            complexPromptChars: z.number().int().positive().optional(),
+            simpleScoreThreshold: z.number().min(0).max(20).optional(),
+          })
+          .strict()
+          .optional(),
+        planner: z
+          .object({
+            mode: z.union([z.literal("off"), z.literal("auto"), z.literal("always")]).optional(),
+            batching: z.boolean().optional(),
+            decomposition: z.boolean().optional(),
+            decomposeScoreThreshold: z.number().min(0).max(20).optional(),
+            maxSubtasks: z.number().int().min(1).max(20).optional(),
+          })
+          .strict()
+          .optional(),
+        inputStructuring: z
+          .object({
+            enabled: z.boolean().optional(),
+            collapseWhitespace: z.boolean().optional(),
+            dedupeLines: z.boolean().optional(),
+            maxConsecutiveBlankLines: z.number().int().min(1).max(10).optional(),
+            minDuplicateLineChars: z.number().int().min(1).max(500).optional(),
+            parseStateLines: z.boolean().optional(),
+            minStateLines: z.number().int().min(1).max(500).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    llmRetry: RetryConfigSchema,
     contextPruning: z
       .object({
-        mode: z.union([z.literal("off"), z.literal("cache-ttl")]).optional(),
+        mode: z.union([z.literal("off"), z.literal("cache-ttl"), z.literal("always")]).optional(),
         ttl: z.string().optional(),
         keepLastAssistants: z.number().int().nonnegative().optional(),
         softTrimRatio: z.number().min(0).max(1).optional(),

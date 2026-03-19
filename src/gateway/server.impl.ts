@@ -655,7 +655,7 @@ export async function startGatewayServer(
   }
 
   const wizardRunner = opts.wizardRunner ?? runSetupWizard;
-  const { wizardSessions, findRunningWizard, purgeWizardSession } = createWizardSessionTracker();
+  const { wizardSessions, registerWizardSession, findRunningWizard, purgeWizardSession } = createWizardSessionTracker();
 
   const deps = createDefaultDeps();
   let canvasHostServer: CanvasHostServer | null = null;
@@ -1113,6 +1113,7 @@ export async function startGatewayServer(
     registerToolEventRecipient: toolEventRecipients.add,
     dedupe,
     wizardSessions,
+    registerWizardSession,
     findRunningWizard,
     purgeWizardSession,
     getRuntimeSnapshot,

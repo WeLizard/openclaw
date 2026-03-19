@@ -5,6 +5,7 @@ import type { CronService } from "../../cron/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
+import type { WizardSessionMetadata } from "../server-wizard-sessions.js";
 import type { ExecApprovalManager } from "../exec-approval-manager.js";
 import type { NodeRegistry } from "../node-registry.js";
 import type { ConnectParams, ErrorShape, RequestFrame } from "../protocol/index.js";
@@ -76,7 +77,10 @@ export type GatewayRequestContext = {
   registerToolEventRecipient: (runId: string, connId: string) => void;
   dedupe: Map<string, DedupeEntry>;
   wizardSessions: Map<string, WizardSession>;
-  findRunningWizard: () => string | null;
+  registerWizardSession: (id: string, session: WizardSession, metadata: WizardSessionMetadata) => void;
+  getWizardSessionMetadata: (id: string) => WizardSessionMetadata | null;
+  findRunningWizard: (match?: Partial<WizardSessionMetadata>) => string | null;
+  deleteWizardSession: (id: string) => void;
   purgeWizardSession: (id: string) => void;
   getRuntimeSnapshot: () => ChannelRuntimeSnapshot;
   startChannel: (

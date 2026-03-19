@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { t } from "../../i18n/index.ts";
 import type { SkillMessageMap } from "../controllers/skills.ts";
 import { clampText } from "../format.ts";
 import type { SkillStatusEntry, SkillStatusReport } from "../types.ts";
@@ -7,6 +8,7 @@ import {
   computeSkillMissing,
   computeSkillReasons,
   renderSkillStatusChips,
+  translateSkillReason,
 } from "./skills-shared.ts";
 
 export type SkillsProps = {
@@ -40,32 +42,24 @@ export function renderSkills(props: SkillsProps) {
     <section class="card">
       <div class="row" style="justify-content: space-between;">
         <div>
-          <div class="card-title">Skills</div>
-          <div class="card-sub">Installed skills and their status.</div>
+          <div class="card-title">${t("skills.title")}</div>
+          <div class="card-sub">${t("skills.subtitle")}</div>
         </div>
-        <button class="btn" ?disabled=${props.loading || !props.connected} @click=${props.onRefresh}>
-          ${props.loading ? "Loading…" : "Refresh"}
+        <button class="btn" ?disabled=${props.loading} @click=${props.onRefresh}>
+          ${props.loading ? t("skills.loading") : t("common.refresh")}
         </button>
       </div>
 
-      <div class="filters" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px;">
-        <a
-          class="btn"
-          href="https://clawhub.com"
-          target="_blank"
-          rel="noreferrer"
-          title="Browse skills on ClawHub"
-        >Browse Skills Store</a>
-        <label class="field" style="flex: 1; min-width: 180px;">
+      <div class="filters" style="margin-top: 14px;">
+        <label class="field" style="flex: 1;">
+          <span>${t("skills.filter")}</span>
           <input
             .value=${props.filter}
             @input=${(e: Event) => props.onFilterChange((e.target as HTMLInputElement).value)}
-            placeholder="Search skills"
-            autocomplete="off"
-            name="skills-filter"
+            placeholder=${t("skills.searchPlaceholder")}
           />
         </label>
-        <div class="muted">${filtered.length} shown</div>
+        <div class="muted">${t("skills.shown", { count: String(filtered.length) })}</div>
       </div>
 
       ${
@@ -77,13 +71,7 @@ export function renderSkills(props: SkillsProps) {
       ${
         filtered.length === 0
           ? html`
-              <div class="muted" style="margin-top: 16px">
-                ${
-                  !props.connected && !props.report
-                    ? "Not connected to gateway."
-                    : "No skills found."
-                }
-              </div>
+              <div class="muted" style="margin-top: 16px">${t("skills.empty")}</div>
             `
           : html`
             <div class="agent-skills-groups" style="margin-top: 16px;">
@@ -128,7 +116,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
           missing.length > 0
             ? html`
               <div class="muted" style="margin-top: 6px;">
-                Missing: ${missing.join(", ")}
+                ${t("skills.missing")}: ${missing.join(", ")}
               </div>
             `
             : nothing
@@ -137,7 +125,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
           reasons.length > 0
             ? html`
               <div class="muted" style="margin-top: 6px;">
-                Reason: ${reasons.join(", ")}
+                ${t("skills.reason")}: ${reasons.map(translateSkillReason).join(", ")}
               </div>
             `
             : nothing
@@ -150,7 +138,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
             ?disabled=${busy}
             @click=${() => props.onToggle(skill.skillKey, skill.disabled)}
           >
-            ${skill.disabled ? "Enable" : "Disable"}
+            ${skill.disabled ? t("skills.enable") : t("skills.disable")}
           </button>
           ${
             canInstall
@@ -159,7 +147,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
                 ?disabled=${busy}
                 @click=${() => props.onInstall(skill.skillKey, skill.name, skill.install[0].id)}
               >
-                ${busy ? "Installing…" : skill.install[0].label}
+                ${busy ? t("skills.installing") : skill.install[0].label}
               </button>`
               : nothing
           }
@@ -182,7 +170,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
           skill.primaryEnv
             ? html`
               <div class="field" style="margin-top: 10px;">
-                <span>API key</span>
+                <span>${t("skills.apiKey")}</span>
                 <input
                   type="password"
                   .value=${apiKey}
@@ -196,7 +184,7 @@ function renderSkill(skill: SkillStatusEntry, props: SkillsProps) {
                 ?disabled=${busy}
                 @click=${() => props.onSaveKey(skill.skillKey)}
               >
-                Save key
+                ${t("skills.saveKey")}
               </button>
             `
             : nothing

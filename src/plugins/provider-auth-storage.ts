@@ -43,6 +43,23 @@ export async function setOpenaiApiKey(
   });
 }
 
+export async function setCustomProviderApiKey(
+  provider: string,
+  key: SecretInput,
+  agentDir?: string,
+  options?: ApiKeyStorageOptions,
+) {
+  const normalizedProvider = String(provider ?? "").trim().toLowerCase();
+  if (!normalizedProvider) {
+    throw new Error("Custom provider id is required.");
+  }
+  upsertAuthProfile({
+    profileId: `${normalizedProvider}:default`,
+    credential: buildApiKeyCredential(normalizedProvider, key, undefined, options),
+    agentDir: resolveAuthAgentDir(agentDir),
+  });
+}
+
 export async function setGeminiApiKey(
   key: SecretInput,
   agentDir?: string,

@@ -53,37 +53,55 @@ import {
 } from "./app-tool-stream.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
-import { exportChatMarkdown } from "./chat/export.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import type { CronFieldErrors } from "./controllers/cron.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import {
+  clearModelAuthCooldown as clearModelAuthCooldownInternal,
+  clearModelAuthOrder as clearModelAuthOrderInternal,
+  deleteModelAuthProfile as deleteModelAuthProfileInternal,
+  disableModelAuthProfile as disableModelAuthProfileInternal,
+  enableModelAuthProfile as enableModelAuthProfileInternal,
+  loadModelAuthStatus as loadModelAuthStatusInternal,
+  promoteModelAuthProfile as promoteModelAuthProfileInternal,
+} from "./controllers/model-auth.ts";
+import { loadAvailableModels as loadAvailableModelsInternal } from "./controllers/model-catalog.ts";
+import {
+  cancelSetupWizard as cancelSetupWizardInternal,
+  dismissSetupWizard as dismissSetupWizardInternal,
+  startSetupWizard as startSetupWizardInternal,
+  submitSetupWizard as submitSetupWizardInternal,
+  updateSetupWizardDraft as updateSetupWizardDraftInternal,
+} from "./controllers/setup-wizard.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
-import { VALID_THEME_NAMES, type ResolvedTheme, type ThemeMode, type ThemeName } from "./theme.ts";
+import type { ResolvedTheme, ThemeMode, ThemeName } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
   ConfigSnapshot,
   ConfigUiHints,
-  ChatModelOverride,
   CronJob,
   CronRunLogEntry,
   CronStatus,
-  HealthSummary,
+  HealthSnapshot,
   LogEntry,
   LogLevel,
-  ModelCatalogEntry,
   PresenceEntry,
   ChannelsStatusSnapshot,
   SessionsListResult,
   SkillStatusReport,
+  ToolsCatalogResult,
+  ModelCatalogEntry,
+  ModelsAuthStatusResult,
   StatusSummary,
   NostrProfile,
-  ToolsCatalogResult,
+  WizardStep,
 } from "./types.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 import { generateUUID } from "./uuid.ts";
@@ -123,15 +141,12 @@ export class OpenClawApp extends LitElement {
     }
   }
   @state() password = "";
-  @state() loginShowGatewayToken = false;
-  @state() loginShowGatewayPassword = false;
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
   @state() connected = false;
   @state() theme: ThemeName = this.settings.theme ?? "claw";
   @state() themeMode: ThemeMode = this.settings.themeMode ?? "system";
   @state() themeResolved: ResolvedTheme = "dark";
-  @state() themeOrder: ThemeName[] = this.buildThemeOrder(this.theme);
   @state() hello: GatewayHelloOk | null = null;
   @state() lastError: string | null = null;
   @state() lastErrorCode: string | null = null;
@@ -151,7 +166,6 @@ export class OpenClawApp extends LitElement {
   @state() chatMessage = "";
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
-  @state() chatStreamSegments: Array<{ text: string; ts: number }> = [];
   @state() chatStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatRunId: string | null = null;
@@ -159,16 +173,9 @@ export class OpenClawApp extends LitElement {
   @state() fallbackStatus: FallbackStatus | null = null;
   @state() chatAvatarUrl: string | null = null;
   @state() chatThinkingLevel: string | null = null;
-  @state() chatModelOverrides: Record<string, ChatModelOverride | null> = {};
-  @state() chatModelsLoading = false;
-  @state() chatModelCatalog: ModelCatalogEntry[] = [];
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
-  @state() navDrawerOpen = false;
-
-  onSlashAction?: (action: string) => void;
-
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -192,7 +199,6 @@ export class OpenClawApp extends LitElement {
   @state() execApprovalBusy = false;
   @state() execApprovalError: string | null = null;
   @state() pendingGatewayUrl: string | null = null;
-  pendingGatewayToken: string | null = null;
 
   @state() configLoading = false;
   @state() configRaw = "{\n}\n";
@@ -285,11 +291,38 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeUnknown = false;
   @state() sessionsHideCron = true;
   @state() sessionsSearchQuery = "";
-  @state() sessionsSortColumn: "key" | "kind" | "updated" | "tokens" = "updated";
+  @state() sessionsSortColumn = "";
   @state() sessionsSortDir: "asc" | "desc" = "desc";
   @state() sessionsPage = 0;
-  @state() sessionsPageSize = 10;
+  @state() sessionsPageSize = 25;
   @state() sessionsActionsOpenKey: string | null = null;
+  @state() availableModelsLoading = false;
+  @state() availableModels: ModelCatalogEntry[] = [];
+  @state() attentionItems: import("./types.ts").AttentionItem[] = [];
+  @state() overviewShowGatewayToken = false;
+  @state() overviewShowGatewayPassword = false;
+  @state() overviewLogLines: string[] = [];
+  @state() overviewLogCursor: number | null = null;
+  @state() loginShowGatewayToken = false;
+  @state() loginShowGatewayPassword = false;
+  @state() modelAuthLoading = false;
+  @state() modelAuthBusyKey: string | null = null;
+  @state() modelAuthError: string | null = null;
+  @state() modelAuthStatus: ModelsAuthStatusResult | null = null;
+  @state() modelAuthDeleteConfirmProfileId: string | null = null;
+  @state() wizardOpen = false;
+  @state() wizardLoading = false;
+  @state() wizardBusy = false;
+  @state() wizardMode: "local" | "remote" = "local";
+  @state() wizardIntent: "onboarding" | "models-auth-login" = "onboarding";
+  @state() wizardProvider: string | null = null;
+  @state() wizardOauthOnly = false;
+  @state() wizardContextLabel: string | null = null;
+  @state() wizardSessionId: string | null = null;
+  @state() wizardStatus: "running" | "done" | "cancelled" | "error" | null = null;
+  @state() wizardError: string | null = null;
+  @state() wizardStep: WizardStep | null = null;
+  @state() wizardDraftValue: unknown = null;
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
@@ -364,7 +397,7 @@ export class OpenClawApp extends LitElement {
   @state() cronStatus: CronStatus | null = null;
   @state() cronError: string | null = null;
   @state() cronForm: CronFormState = { ...DEFAULT_CRON_FORM };
-  @state() cronFieldErrors: import("./controllers/cron.js").CronFieldErrors = {};
+  @state() cronFieldErrors: CronFieldErrors = {};
   @state() cronEditingJobId: string | null = null;
   @state() cronRunsJobId: string | null = null;
   @state() cronRunsLoadingMore = false;
@@ -384,16 +417,6 @@ export class OpenClawApp extends LitElement {
 
   @state() updateAvailable: import("./types.js").UpdateAvailable | null = null;
 
-  // Overview dashboard state
-  @state() attentionItems: import("./types.js").AttentionItem[] = [];
-  @state() paletteOpen = false;
-  @state() paletteQuery = "";
-  @state() paletteActiveIndex = 0;
-  @state() overviewShowGatewayToken = false;
-  @state() overviewShowGatewayPassword = false;
-  @state() overviewLogLines: string[] = [];
-  @state() overviewLogCursor = 0;
-
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
   @state() skillsError: string | null = null;
@@ -402,14 +425,10 @@ export class OpenClawApp extends LitElement {
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
 
-  @state() healthLoading = false;
-  @state() healthResult: HealthSummary | null = null;
-  @state() healthError: string | null = null;
-
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
-  @state() debugHealth: HealthSummary | null = null;
-  @state() debugModels: ModelCatalogEntry[] = [];
+  @state() debugHealth: HealthSnapshot | null = null;
+  @state() debugModels: unknown[] = [];
   @state() debugHeartbeat: unknown = null;
   @state() debugCallMethod = "";
   @state() debugCallParams = "{}";
@@ -438,6 +457,14 @@ export class OpenClawApp extends LitElement {
   private chatHasAutoScrolled = false;
   private chatUserNearBottom = true;
   @state() chatNewMessagesBelow = false;
+  @state() chatStreamSegments: unknown[] = [];
+  @state() chatModelOverrides: Record<string, import("./types.ts").ChatModelOverride | null> = {};
+  @state() chatModelsLoading = false;
+  @state() chatModelCatalog: import("./types.ts").ModelCatalogEntry[] = [];
+  @state() navDrawerOpen = false;
+  @state() paletteOpen = false;
+  @state() paletteQuery = "";
+  @state() paletteActiveIndex: number | null = null;
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
@@ -448,17 +475,9 @@ export class OpenClawApp extends LitElement {
   basePath = "";
   private popStateHandler = () =>
     onPopStateInternal(this as unknown as Parameters<typeof onPopStateInternal>[0]);
+  private themeMedia: MediaQueryList | null = null;
+  private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
-  private globalKeydownHandler = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "k") {
-      e.preventDefault();
-      this.paletteOpen = !this.paletteOpen;
-      if (this.paletteOpen) {
-        this.paletteQuery = "";
-        this.paletteActiveIndex = 0;
-      }
-    }
-  };
 
   createRenderRoot() {
     return this;
@@ -466,20 +485,6 @@ export class OpenClawApp extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.onSlashAction = (action: string) => {
-      switch (action) {
-        case "toggle-focus":
-          this.applySettings({
-            ...this.settings,
-            chatFocusMode: !this.settings.chatFocusMode,
-          });
-          break;
-        case "export":
-          exportChatMarkdown(this.chatMessages, this.assistantName);
-          break;
-      }
-    };
-    document.addEventListener("keydown", this.globalKeydownHandler);
     handleConnected(this as unknown as Parameters<typeof handleConnected>[0]);
   }
 
@@ -488,7 +493,6 @@ export class OpenClawApp extends LitElement {
   }
 
   disconnectedCallback() {
-    document.removeEventListener("keydown", this.globalKeydownHandler);
     handleDisconnected(this as unknown as Parameters<typeof handleDisconnected>[0]);
     super.disconnectedCallback();
   }
@@ -546,12 +550,10 @@ export class OpenClawApp extends LitElement {
 
   setTab(next: Tab) {
     setTabInternal(this as unknown as Parameters<typeof setTabInternal>[0], next);
-    this.navDrawerOpen = false;
   }
 
   setTheme(next: ThemeName, context?: Parameters<typeof setThemeInternal>[2]) {
     setThemeInternal(this as unknown as Parameters<typeof setThemeInternal>[0], next, context);
-    this.themeOrder = this.buildThemeOrder(next);
   }
 
   setThemeMode(next: ThemeMode, context?: Parameters<typeof setThemeModeInternal>[2]) {
@@ -578,6 +580,81 @@ export class OpenClawApp extends LitElement {
 
   async loadOverview() {
     await loadOverviewInternal(this as unknown as Parameters<typeof loadOverviewInternal>[0]);
+  }
+
+  async handleLoadModelAuthStatus() {
+    await loadModelAuthStatusInternal(this);
+  }
+
+  async loadAvailableModels() {
+    await loadAvailableModelsInternal(this);
+  }
+
+  async handlePromoteModelAuthProfile(provider: string, profileId: string) {
+    await promoteModelAuthProfileInternal(this, provider, profileId);
+  }
+
+  async handleClearModelAuthOrder(provider: string) {
+    await clearModelAuthOrderInternal(this, provider);
+  }
+
+  async handleClearModelAuthCooldown(profileId: string) {
+    await clearModelAuthCooldownInternal(this, profileId);
+  }
+
+  async handleDisableModelAuthProfile(profileId: string) {
+    await disableModelAuthProfileInternal(this, profileId);
+  }
+
+  async handleEnableModelAuthProfile(profileId: string) {
+    await enableModelAuthProfileInternal(this, profileId);
+  }
+
+  requestDeleteModelAuthProfile(profileId: string) {
+    this.modelAuthDeleteConfirmProfileId =
+      this.modelAuthDeleteConfirmProfileId === profileId ? null : profileId;
+  }
+
+  cancelDeleteModelAuthProfile() {
+    this.modelAuthDeleteConfirmProfileId = null;
+  }
+
+  async handleDeleteModelAuthProfile(profileId: string) {
+    try {
+      await deleteModelAuthProfileInternal(this, profileId);
+    } finally {
+      if (this.modelAuthDeleteConfirmProfileId === profileId) {
+        this.modelAuthDeleteConfirmProfileId = null;
+      }
+    }
+  }
+
+  async handleStartSetupWizard(mode: "local" | "remote") {
+    await startSetupWizardInternal(this, mode, { intent: "onboarding" });
+  }
+
+  async handleStartProviderAuth(provider?: string) {
+    await startSetupWizardInternal(this, "local", {
+      intent: "models-auth-login",
+      ...(provider ? { provider } : {}),
+      oauthOnly: false,
+    });
+  }
+
+  async handleSubmitSetupWizard() {
+    await submitSetupWizardInternal(this);
+  }
+
+  async handleCancelSetupWizard() {
+    await cancelSetupWizardInternal(this);
+  }
+
+  handleDismissSetupWizard() {
+    dismissSetupWizardInternal(this);
+  }
+
+  handleUpdateSetupWizardDraft(value: unknown) {
+    updateSetupWizardDraftInternal(this, value);
   }
 
   async loadCron() {
@@ -675,20 +752,16 @@ export class OpenClawApp extends LitElement {
     if (!nextGatewayUrl) {
       return;
     }
-    const nextToken = this.pendingGatewayToken?.trim() || "";
     this.pendingGatewayUrl = null;
-    this.pendingGatewayToken = null;
     applySettingsInternal(this as unknown as Parameters<typeof applySettingsInternal>[0], {
       ...this.settings,
       gatewayUrl: nextGatewayUrl,
-      token: nextToken,
     });
     this.connect();
   }
 
   handleGatewayUrlCancel() {
     this.pendingGatewayUrl = null;
-    this.pendingGatewayToken = null;
   }
 
   // Sidebar handlers for tool output viewing

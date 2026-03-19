@@ -5,6 +5,7 @@ import { saveAuthProfileStore, updateAuthProfileStoreWithLock } from "./store.js
 import type { AuthProfileFailureReason, AuthProfileStore, ProfileUsageStats } from "./types.js";
 
 const FAILURE_REASON_PRIORITY: AuthProfileFailureReason[] = [
+  "manual",
   "auth_permanent",
   "auth",
   "billing",

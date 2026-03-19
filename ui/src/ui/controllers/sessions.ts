@@ -77,6 +77,7 @@ export async function patchSession(
     fastMode?: boolean | null;
     verboseLevel?: string | null;
     reasoningLevel?: string | null;
+    model?: string | null;
   },
 ) {
   if (!state.client || !state.connected) {
@@ -97,6 +98,9 @@ export async function patchSession(
   }
   if ("reasoningLevel" in patch) {
     params.reasoningLevel = patch.reasoningLevel;
+  }
+  if ("model" in patch) {
+    params.model = patch.model;
   }
   try {
     await state.client.request("sessions.patch", params);

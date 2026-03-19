@@ -4,34 +4,36 @@ import type { CronModelSuggestionsState, CronState } from "./controllers/cron.ts
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import type { ModelCatalogState } from "./controllers/model-catalog.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
-import type { ResolvedTheme, ThemeMode, ThemeName } from "./theme.ts";
+import type { ThemeMode, ThemeName } from "./theme.ts";
 import type {
   AgentsListResult,
   AgentsFilesListResult,
   AgentIdentityResult,
-  AttentionItem,
+  ChatModelOverride,
   ChannelsStatusSnapshot,
   ConfigSnapshot,
   ConfigUiHints,
-  HealthSummary,
+  HealthSnapshot,
   LogEntry,
   LogLevel,
-  ChatModelOverride,
   ModelCatalogEntry,
   NostrProfile,
   PresenceEntry,
   SessionsUsageResult,
   CostUsageSummary,
+  ModelsAuthStatusResult,
   SessionUsageTimeSeries,
   SessionsListResult,
   SkillStatusReport,
-  StatusSummary,
   ToolsCatalogResult,
+  StatusSummary,
+  WizardStep,
 } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
@@ -40,16 +42,13 @@ import type { SessionLogEntry } from "./views/usage.ts";
 export type AppViewState = {
   settings: UiSettings;
   password: string;
-  loginShowGatewayToken: boolean;
-  loginShowGatewayPassword: boolean;
   tab: Tab;
   onboarding: boolean;
   basePath: string;
   connected: boolean;
   theme: ThemeName;
   themeMode: ThemeMode;
-  themeResolved: ResolvedTheme;
-  themeOrder: ThemeName[];
+  themeResolved: "light" | "dark";
   hello: GatewayHelloOk | null;
   lastError: string | null;
   lastErrorCode: string | null;
@@ -64,7 +63,6 @@ export type AppViewState = {
   chatAttachments: ChatAttachment[];
   chatMessages: unknown[];
   chatToolMessages: unknown[];
-  chatStreamSegments: Array<{ text: string; ts: number }>;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
@@ -72,15 +70,23 @@ export type AppViewState = {
   fallbackStatus: FallbackStatus | null;
   chatAvatarUrl: string | null;
   chatThinkingLevel: string | null;
+  chatQueue: ChatQueueItem[];
+  chatManualRefreshInFlight: boolean;
   chatModelOverrides: Record<string, ChatModelOverride | null>;
   chatModelsLoading: boolean;
   chatModelCatalog: ModelCatalogEntry[];
-  chatQueue: ChatQueueItem[];
-  chatManualRefreshInFlight: boolean;
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
+  chatStreamSegments: unknown[];
+  overviewLogLines: string[];
+  overviewShowGatewayToken: boolean;
+  overviewShowGatewayPassword: boolean;
+  attentionItems: import("./types.ts").AttentionItem[];
   navDrawerOpen: boolean;
+  paletteOpen: boolean;
+  paletteQuery: string;
+  paletteActiveIndex: number | null;
   sidebarOpen: boolean;
   sidebarContent: string | null;
   sidebarError: string | null;
@@ -187,11 +193,31 @@ export type AppViewState = {
   sessionsIncludeUnknown: boolean;
   sessionsHideCron: boolean;
   sessionsSearchQuery: string;
-  sessionsSortColumn: "key" | "kind" | "updated" | "tokens";
+  sessionsSortColumn: string;
   sessionsSortDir: "asc" | "desc";
   sessionsPage: number;
   sessionsPageSize: number;
   sessionsActionsOpenKey: string | null;
+  availableModelsLoading: boolean;
+  availableModels: import("./types.ts").ModelCatalogEntry[];
+  modelAuthLoading: boolean;
+  modelAuthBusyKey: string | null;
+  modelAuthError: string | null;
+  modelAuthStatus: ModelsAuthStatusResult | null;
+  modelAuthDeleteConfirmProfileId: string | null;
+  wizardOpen: boolean;
+  wizardLoading: boolean;
+  wizardBusy: boolean;
+  wizardMode: "local" | "remote";
+  wizardIntent: "onboarding" | "models-auth-login";
+  wizardProvider: string | null;
+  wizardOauthOnly: boolean;
+  wizardContextLabel: string | null;
+  wizardSessionId: string | null;
+  wizardStatus: "running" | "done" | "cancelled" | "error" | null;
+  wizardError: string | null;
+  wizardStep: WizardStep | null;
+  wizardDraftValue: unknown;
   usageLoading: boolean;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
@@ -262,7 +288,8 @@ export type AppViewState = {
   | "cronRunsSortDir"
   | "cronBusy"
 > &
-  Pick<CronModelSuggestionsState, "cronModelSuggestions"> & {
+  Pick<CronModelSuggestionsState, "cronModelSuggestions"> &
+  Pick<ModelCatalogState, "availableModelsLoading" | "availableModels"> & {
     skillsLoading: boolean;
     skillsReport: SkillStatusReport | null;
     skillsError: string | null;
@@ -270,13 +297,10 @@ export type AppViewState = {
     skillEdits: Record<string, string>;
     skillMessages: Record<string, SkillMessage>;
     skillsBusyKey: string | null;
-    healthLoading: boolean;
-    healthResult: HealthSummary | null;
-    healthError: string | null;
     debugLoading: boolean;
     debugStatus: StatusSummary | null;
-    debugHealth: HealthSummary | null;
-    debugModels: ModelCatalogEntry[];
+    debugHealth: HealthSnapshot | null;
+    debugModels: unknown[];
     debugHeartbeat: unknown;
     debugCallMethod: string;
     debugCallParams: string;
@@ -295,16 +319,10 @@ export type AppViewState = {
     logsLimit: number;
     logsMaxBytes: number;
     logsAtBottom: boolean;
+    loginShowGatewayToken: boolean;
+    loginShowGatewayPassword: boolean;
+    overviewLogCursor: number | null;
     updateAvailable: import("./types.js").UpdateAvailable | null;
-    attentionItems: AttentionItem[];
-    paletteOpen: boolean;
-    paletteQuery: string;
-    paletteActiveIndex: number;
-    streamMode: boolean;
-    overviewShowGatewayToken: boolean;
-    overviewShowGatewayPassword: boolean;
-    overviewLogLines: string[];
-    overviewLogCursor: number;
     client: GatewayBrowserClient | null;
     refreshSessionsAfterChat: Set<string>;
     connect: () => void;
@@ -351,6 +369,21 @@ export type AppViewState = {
     handleSessionsPatch: (key: string, patch: unknown) => Promise<void>;
     handleLoadNodes: () => Promise<void>;
     handleLoadPresence: () => Promise<void>;
+    handleLoadModelAuthStatus: () => Promise<void>;
+    handlePromoteModelAuthProfile: (provider: string, profileId: string) => Promise<void>;
+    handleClearModelAuthOrder: (provider: string) => Promise<void>;
+    handleClearModelAuthCooldown: (profileId: string) => Promise<void>;
+    handleDisableModelAuthProfile: (profileId: string) => Promise<void>;
+    handleEnableModelAuthProfile: (profileId: string) => Promise<void>;
+    handleDeleteModelAuthProfile: (profileId: string) => Promise<void>;
+    requestDeleteModelAuthProfile: (profileId: string) => void;
+    cancelDeleteModelAuthProfile: () => void;
+    handleStartSetupWizard: (mode: "local" | "remote") => Promise<void>;
+    handleStartProviderAuth: (provider?: string) => Promise<void>;
+    handleSubmitSetupWizard: () => Promise<void>;
+    handleCancelSetupWizard: () => Promise<void>;
+    handleDismissSetupWizard: () => void;
+    handleUpdateSetupWizardDraft: (value: unknown) => void;
     handleLoadSkills: () => Promise<void>;
     handleLoadDebug: () => Promise<void>;
     handleLoadLogs: () => Promise<void>;

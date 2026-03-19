@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { t } from "../../i18n/index.ts";
 import type { SkillStatusEntry } from "../types.ts";
 
 export function computeSkillMissing(skill: SkillStatusEntry): string[] {
@@ -16,9 +17,20 @@ export function computeSkillReasons(skill: SkillStatusEntry): string[] {
     reasons.push("disabled");
   }
   if (skill.blockedByAllowlist) {
-    reasons.push("blocked by allowlist");
+    reasons.push("blockedByAllowlist");
   }
   return reasons;
+}
+
+export function translateSkillReason(reason: string): string {
+  switch (reason) {
+    case "disabled":
+      return t("skills.reasonValues.disabled");
+    case "blockedByAllowlist":
+      return t("skills.reasonValues.blockedByAllowlist");
+    default:
+      return reason;
+  }
 }
 
 export function renderSkillStatusChips(params: {
@@ -33,17 +45,17 @@ export function renderSkillStatusChips(params: {
       ${
         showBundledBadge
           ? html`
-              <span class="chip">bundled</span>
+              <span class="chip">${t("skills.status.bundled")}</span>
             `
           : nothing
       }
       <span class="chip ${skill.eligible ? "chip-ok" : "chip-warn"}">
-        ${skill.eligible ? "eligible" : "blocked"}
+        ${skill.eligible ? t("skills.status.eligible") : t("skills.status.blocked")}
       </span>
       ${
         skill.disabled
           ? html`
-              <span class="chip chip-warn">disabled</span>
+              <span class="chip chip-warn">${t("skills.status.disabled")}</span>
             `
           : nothing
       }

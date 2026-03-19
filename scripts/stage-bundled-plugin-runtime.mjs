@@ -13,7 +13,17 @@ function relativeSymlinkTarget(sourcePath, targetPath) {
 }
 
 function symlinkPath(sourcePath, targetPath, type) {
-  fs.symlinkSync(relativeSymlinkTarget(sourcePath, targetPath), targetPath, type);
+  try {
+    fs.symlinkSync(relativeSymlinkTarget(sourcePath, targetPath), targetPath, type);
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    const sourceStats = fs.statSync(sourcePath);
+    if ((code === "EPERM" || code === "EACCES") && sourceStats.isFile()) {
+      fs.copyFileSync(sourcePath, targetPath);
+      return;
+    }
+    throw error;
+  }
 }
 
 function shouldWrapRuntimeJsFile(sourcePath) {

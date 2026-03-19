@@ -284,8 +284,8 @@ function fieldLabelForKey(
     payloadThinking: t("cron.form.thinking"),
     timeoutSeconds: t("cron.form.timeoutSeconds"),
     deliveryTo: t("cron.form.to"),
-    failureAlertAfter: "Failure alert after",
-    failureAlertCooldownSeconds: "Failure alert cooldown",
+    failureAlertAfter: t("cron.form.failureAlertAfter"),
+    failureAlertCooldownSeconds: t("cron.form.failureAlertCooldown"),
   };
   return labels[key];
 }
@@ -1143,10 +1143,8 @@ export function renderCron(props: CronProps) {
                               payloadLightContext: (e.target as HTMLInputElement).checked,
                             })}
                         />
-                        <span class="field-checkbox__label">Light context</span>
-                        <div class="cron-help">
-                          Use lightweight bootstrap context for this agent job.
-                        </div>
+                        <span class="field-checkbox__label">${t("cron.form.lightContext")}</span>
+                        <div class="cron-help">${t("cron.form.lightContextHelp")}</div>
                       </label>
                       <label class="field">
                         ${renderFieldLabel(t("cron.form.model"))}
@@ -1183,7 +1181,7 @@ export function renderCron(props: CronProps) {
                 isAgentTurn
                   ? html`
                       <label class="field cron-span-2">
-                        ${renderFieldLabel("Failure alerts")}
+                        ${renderFieldLabel(t("cron.form.failureAlerts"))}
                         <select
                           .value=${props.form.failureAlertMode}
                           @change=${(e: Event) =>
@@ -1192,19 +1190,17 @@ export function renderCron(props: CronProps) {
                                 .value as CronFormState["failureAlertMode"],
                             })}
                         >
-                          <option value="inherit">Inherit global setting</option>
-                          <option value="disabled">Disable for this job</option>
-                          <option value="custom">Custom per-job settings</option>
+                          <option value="inherit">${t("cron.form.failureAlertsInherit")}</option>
+                          <option value="disabled">${t("cron.form.failureAlertsDisabled")}</option>
+                          <option value="custom">${t("cron.form.failureAlertsCustom")}</option>
                         </select>
-                        <div class="cron-help">
-                          Control when this job sends repeated-failure alerts.
-                        </div>
+                        <div class="cron-help">${t("cron.form.failureAlertsHelp")}</div>
                       </label>
                       ${
                         props.form.failureAlertMode === "custom"
                           ? html`
                               <label class="field">
-                                ${renderFieldLabel("Alert after")}
+                                ${renderFieldLabel(t("cron.form.failureAlertAfter"))}
                                 <input
                                   id="cron-failure-alert-after"
                                   .value=${props.form.failureAlertAfter}
@@ -1220,14 +1216,14 @@ export function renderCron(props: CronProps) {
                                     })}
                                   placeholder="2"
                                 />
-                                <div class="cron-help">Consecutive errors before alerting.</div>
+                                <div class="cron-help">${t("cron.form.failureAlertAfterHelp")}</div>
                                 ${renderFieldError(
                                   props.fieldErrors.failureAlertAfter,
                                   errorIdForField("failureAlertAfter"),
                                 )}
                               </label>
                               <label class="field">
-                                ${renderFieldLabel("Cooldown (seconds)")}
+                                ${renderFieldLabel(t("cron.form.failureAlertCooldown"))}
                                 <input
                                   id="cron-failure-alert-cooldown-seconds"
                                   .value=${props.form.failureAlertCooldownSeconds}
@@ -1244,14 +1240,14 @@ export function renderCron(props: CronProps) {
                                     })}
                                   placeholder="3600"
                                 />
-                                <div class="cron-help">Minimum seconds between alerts.</div>
+                                <div class="cron-help">${t("cron.form.failureAlertCooldownHelp")}</div>
                                 ${renderFieldError(
                                   props.fieldErrors.failureAlertCooldownSeconds,
                                   errorIdForField("failureAlertCooldownSeconds"),
                                 )}
                               </label>
                               <label class="field">
-                                ${renderFieldLabel("Alert channel")}
+                                ${renderFieldLabel(t("cron.form.failureAlertChannel"))}
                                 <select
                                   .value=${props.form.failureAlertChannel || "last"}
                                   @change=${(e: Event) =>
@@ -1266,9 +1262,10 @@ export function renderCron(props: CronProps) {
                                       </option>`,
                                   )}
                                 </select>
+                                <div class="cron-help">${t("cron.form.failureAlertChannelHelp")}</div>
                               </label>
                               <label class="field">
-                                ${renderFieldLabel("Alert to")}
+                                ${renderFieldLabel(t("cron.form.failureAlertTo"))}
                                 <input
                                   .value=${props.form.failureAlertTo}
                                   list="cron-delivery-to-suggestions"
@@ -1276,14 +1273,12 @@ export function renderCron(props: CronProps) {
                                     props.onFormChange({
                                       failureAlertTo: (e.target as HTMLInputElement).value,
                                     })}
-                                  placeholder="+1555... or chat id"
+                                  placeholder=${t("cron.form.toPlaceholder")}
                                 />
-                                <div class="cron-help">
-                                  Optional recipient override for failure alerts.
-                                </div>
+                                <div class="cron-help">${t("cron.form.failureAlertToHelp")}</div>
                               </label>
                               <label class="field">
-                                ${renderFieldLabel("Alert mode")}
+                                ${renderFieldLabel(t("cron.form.failureAlertModeLabel"))}
                                 <select
                                   .value=${props.form.failureAlertDeliveryMode || "announce"}
                                   @change=${(e: Event) =>
@@ -1292,20 +1287,24 @@ export function renderCron(props: CronProps) {
                                         .value as CronFormState["failureAlertDeliveryMode"],
                                     })}
                                 >
-                                  <option value="announce">Announce (via channel)</option>
-                                  <option value="webhook">Webhook (HTTP POST)</option>
+                                  <option value="announce">${t("cron.form.failureAlertModeAnnounce")}</option>
+                                  <option value="webhook">${t("cron.form.failureAlertModeWebhook")}</option>
                                 </select>
+                                <div class="cron-help">${t("cron.form.failureAlertModeHelp")}</div>
                               </label>
                               <label class="field">
-                                ${renderFieldLabel("Alert account ID")}
+                                ${renderFieldLabel(t("cron.form.failureAlertAccountId"))}
                                 <input
                                   .value=${props.form.failureAlertAccountId}
                                   @input=${(e: Event) =>
                                     props.onFormChange({
                                       failureAlertAccountId: (e.target as HTMLInputElement).value,
                                     })}
-                                  placeholder="Account ID for multi-account setups"
+                                  placeholder=${t("cron.form.failureAlertAccountIdPlaceholder")}
                                 />
+                                <div class="cron-help">
+                                  ${t("cron.form.failureAlertAccountIdHelp")}
+                                </div>
                               </label>
                             `
                           : nothing

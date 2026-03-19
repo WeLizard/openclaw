@@ -60,11 +60,19 @@ class I18nManager {
     const initialLocale = this.resolveInitialLocale();
     if (initialLocale === DEFAULT_LOCALE) {
       this.locale = DEFAULT_LOCALE;
+      this.applyDocumentLocale(DEFAULT_LOCALE);
       return;
     }
     // Use the normal locale setter so startup locale loading follows the same
     // translation-loading + notify path as manual locale changes.
     void this.setLocale(initialLocale);
+  }
+
+  private applyDocumentLocale(locale: Locale) {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.documentElement.lang = locale;
   }
 
   public getLocale(): Locale {
@@ -92,6 +100,7 @@ class I18nManager {
 
     this.locale = locale;
     this.persistLocale(locale);
+    this.applyDocumentLocale(locale);
     this.notify();
   }
 

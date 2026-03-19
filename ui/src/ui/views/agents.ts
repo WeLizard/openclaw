@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { t } from "../../i18n/index.ts";
 import type {
   AgentIdentityResult,
   AgentsFilesListResult,
@@ -9,61 +10,26 @@ import type {
   SkillStatusReport,
   ToolsCatalogResult,
 } from "../types.ts";
-import { renderAgentOverview } from "./agents-panels-overview.ts";
 import {
   renderAgentFiles,
   renderAgentChannels,
   renderAgentCron,
 } from "./agents-panels-status-files.ts";
 import { renderAgentTools, renderAgentSkills } from "./agents-panels-tools-skills.ts";
-import { agentBadgeText, buildAgentContext, normalizeAgentLabel } from "./agents-utils.ts";
+import {
+  agentBadgeText,
+  buildAgentContext,
+  buildModelOptions,
+  normalizeAgentLabel,
+  parseFallbackList,
+  resolveAgentConfig,
+  resolveAgentEmoji,
+  resolveEffectiveModelFallbacks,
+  resolveModelLabel,
+  resolveModelPrimary,
+} from "./agents-utils.ts";
 
 export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron";
-
-export type ConfigState = {
-  form: Record<string, unknown> | null;
-  loading: boolean;
-  saving: boolean;
-  dirty: boolean;
-};
-
-export type ChannelsState = {
-  snapshot: ChannelsStatusSnapshot | null;
-  loading: boolean;
-  error: string | null;
-  lastSuccess: number | null;
-};
-
-export type CronState = {
-  status: CronStatus | null;
-  jobs: CronJob[];
-  loading: boolean;
-  error: string | null;
-};
-
-export type AgentFilesState = {
-  list: AgentsFilesListResult | null;
-  loading: boolean;
-  error: string | null;
-  active: string | null;
-  contents: Record<string, string>;
-  drafts: Record<string, string>;
-  saving: boolean;
-};
-
-export type AgentSkillsState = {
-  report: SkillStatusReport | null;
-  loading: boolean;
-  error: string | null;
-  agentId: string | null;
-  filter: string;
-};
-
-export type ToolsCatalogState = {
-  loading: boolean;
-  error: string | null;
-  result: ToolsCatalogResult | null;
-};
 
 export type AgentsProps = {
   basePath: string;
@@ -72,15 +38,48 @@ export type AgentsProps = {
   agentsList: AgentsListResult | null;
   selectedAgentId: string | null;
   activePanel: AgentsPanel;
-  config: ConfigState;
-  channels: ChannelsState;
-  cron: CronState;
-  agentFiles: AgentFilesState;
+  config: {
+    form: Record<string, unknown> | null;
+    loading: boolean;
+    saving: boolean;
+    dirty: boolean;
+  };
+  channels: {
+    snapshot: ChannelsStatusSnapshot | null;
+    loading: boolean;
+    error: string | null;
+    lastSuccess: number | null;
+  };
+  cron: {
+    status: CronStatus | null;
+    jobs: CronJob[];
+    loading: boolean;
+    error: string | null;
+  };
+  agentFiles: {
+    list: AgentsFilesListResult | null;
+    loading: boolean;
+    error: string | null;
+    active: string | null;
+    contents: Record<string, string>;
+    drafts: Record<string, string>;
+    saving: boolean;
+  };
   agentIdentityLoading: boolean;
   agentIdentityError: string | null;
   agentIdentityById: Record<string, AgentIdentityResult>;
-  agentSkills: AgentSkillsState;
-  toolsCatalog: ToolsCatalogState;
+  agentSkills: {
+    report: SkillStatusReport | null;
+    loading: boolean;
+    error: string | null;
+    agentId: string | null;
+    filter: string;
+  };
+  toolsCatalog: {
+    loading: boolean;
+    error: string | null;
+    result: ToolsCatalogResult | null;
+  };
   onRefresh: () => void;
   onSelectAgent: (agentId: string) => void;
   onSelectPanel: (panel: AgentsPanel) => void;
@@ -97,13 +96,22 @@ export type AgentsProps = {
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
   onChannelsRefresh: () => void;
   onCronRefresh: () => void;
-  onCronRunNow: (jobId: string) => void;
+  onCronRunNow?: (jobId: string) => void;
   onSkillsFilterChange: (next: string) => void;
   onSkillsRefresh: () => void;
   onAgentSkillToggle: (agentId: string, skillName: string, enabled: boolean) => void;
   onAgentSkillsClear: (agentId: string) => void;
   onAgentSkillsDisableAll: (agentId: string) => void;
-  onSetDefault: (agentId: string) => void;
+  onSetDefault?: (agentId: string) => void;
+};
+
+export type AgentContext = {
+  workspace: string;
+  model: string;
+  identityName: string;
+  identityEmoji: string;
+  skillsLabel: string;
+  isDefault: boolean;
 };
 
 export function renderAgents(props: AgentsProps) {
@@ -113,113 +121,67 @@ export function renderAgents(props: AgentsProps) {
   const selectedAgent = selectedId
     ? (agents.find((agent) => agent.id === selectedId) ?? null)
     : null;
-  const selectedSkillCount =
-    selectedId && props.agentSkills.agentId === selectedId
-      ? (props.agentSkills.report?.skills?.length ?? null)
-      : null;
-
-  const channelEntryCount = props.channels.snapshot
-    ? Object.keys(props.channels.snapshot.channelAccounts ?? {}).length
-    : null;
-  const cronJobCount = selectedId
-    ? props.cron.jobs.filter((j) => j.agentId === selectedId).length
-    : null;
-  const tabCounts: Record<string, number | null> = {
-    files: props.agentFiles.list?.files?.length ?? null,
-    skills: selectedSkillCount,
-    channels: channelEntryCount,
-    cron: cronJobCount || null,
-  };
 
   return html`
     <div class="agents-layout">
-      <section class="agents-toolbar">
-        <div class="agents-toolbar-row">
-          <span class="agents-toolbar-label">Agent</span>
-          <div class="agents-control-row">
-            <div class="agents-control-select">
-              <select
-                class="agents-select"
-                .value=${selectedId ?? ""}
-                ?disabled=${props.loading || agents.length === 0}
-                @change=${(e: Event) => props.onSelectAgent((e.target as HTMLSelectElement).value)}
-              >
-                ${
-                  agents.length === 0
-                    ? html`
-                        <option value="">No agents</option>
-                      `
-                    : agents.map(
-                        (agent) => html`
-                        <option value=${agent.id} ?selected=${agent.id === selectedId}>
-                          ${normalizeAgentLabel(agent)}${agentBadgeText(agent.id, defaultId) ? ` (${agentBadgeText(agent.id, defaultId)})` : ""}
-                        </option>
-                      `,
-                      )
-                }
-              </select>
-            </div>
-            <div class="agents-control-actions">
-              ${
-                selectedAgent
-                  ? html`
-                      <div class="agent-actions-wrap">
-                        <button
-                          class="agent-actions-toggle"
-                          type="button"
-                          @click=${() => {
-                            actionsMenuOpen = !actionsMenuOpen;
-                          }}
-                        >⋯</button>
-                        ${
-                          actionsMenuOpen
-                            ? html`
-                                <div class="agent-actions-menu">
-                                  <button type="button" @click=${() => {
-                                    void navigator.clipboard.writeText(selectedAgent.id);
-                                    actionsMenuOpen = false;
-                                  }}>Copy agent ID</button>
-                                  <button
-                                    type="button"
-                                    ?disabled=${Boolean(defaultId && selectedAgent.id === defaultId)}
-                                    @click=${() => {
-                                      props.onSetDefault(selectedAgent.id);
-                                      actionsMenuOpen = false;
-                                    }}
-                                  >
-                                    ${defaultId && selectedAgent.id === defaultId ? "Already default" : "Set as default"}
-                                  </button>
-                                </div>
-                              `
-                            : nothing
-                        }
-                      </div>
-                    `
-                  : nothing
-              }
-              <button class="btn btn--sm agents-refresh-btn" ?disabled=${props.loading} @click=${props.onRefresh}>
-                ${props.loading ? "Loading…" : "Refresh"}
-              </button>
-            </div>
+      <section class="card agents-sidebar">
+        <div class="row" style="justify-content: space-between;">
+          <div>
+            <div class="card-title">${t("agentsPage.title")}</div>
+            <div class="card-sub">${t("agentsPage.configured", { count: String(agents.length) })}</div>
           </div>
+          <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
+            ${props.loading ? t("agentsPage.loading") : t("common.refresh")}
+          </button>
         </div>
         ${
           props.error
-            ? html`<div class="callout danger" style="margin-top: 8px;">${props.error}</div>`
+            ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
             : nothing
         }
+        <div class="agent-list" style="margin-top: 12px;">
+          ${
+            agents.length === 0
+              ? html`
+                  <div class="muted">${t("agentsPage.empty")}</div>
+                `
+              : agents.map((agent) => {
+                  const badge = agentBadgeText(agent.id, defaultId);
+                  const emoji = resolveAgentEmoji(agent, props.agentIdentityById[agent.id] ?? null);
+                  return html`
+                    <button
+                      type="button"
+                      class="agent-row ${selectedId === agent.id ? "active" : ""}"
+                      @click=${() => props.onSelectAgent(agent.id)}
+                    >
+                      <div class="agent-avatar">${emoji || normalizeAgentLabel(agent).slice(0, 1)}</div>
+                      <div class="agent-info">
+                        <div class="agent-title">${normalizeAgentLabel(agent)}</div>
+                        <div class="agent-sub mono">${agent.id}</div>
+                      </div>
+                      ${badge ? html`<span class="agent-pill">${badge}</span>` : nothing}
+                    </button>
+                  `;
+                })
+          }
+        </div>
       </section>
       <section class="agents-main">
         ${
           !selectedAgent
             ? html`
                 <div class="card">
-                  <div class="card-title">Select an agent</div>
-                  <div class="card-sub">Pick an agent to inspect its workspace and tools.</div>
+                  <div class="card-title">${t("agentsPage.selectTitle")}</div>
+                  <div class="card-sub">${t("agentsPage.selectSubtitle")}</div>
                 </div>
               `
             : html`
-                ${renderAgentTabs(props.activePanel, (panel) => props.onSelectPanel(panel), tabCounts)}
+                ${renderAgentHeader(
+                  selectedAgent,
+                  defaultId,
+                  props.agentIdentityById[selectedAgent.id] ?? null,
+                )}
+                ${renderAgentTabs(props.activePanel, (panel) => props.onSelectPanel(panel))}
                 ${
                   props.activePanel === "overview"
                     ? renderAgentOverview({
@@ -337,7 +299,6 @@ export function renderAgents(props: AgentsProps) {
                         loading: props.cron.loading,
                         error: props.cron.error,
                         onRefresh: props.onCronRefresh,
-                        onRunNow: props.onCronRunNow,
                       })
                     : nothing
                 }
@@ -348,20 +309,40 @@ export function renderAgents(props: AgentsProps) {
   `;
 }
 
-let actionsMenuOpen = false;
-
-function renderAgentTabs(
-  active: AgentsPanel,
-  onSelect: (panel: AgentsPanel) => void,
-  counts: Record<string, number | null>,
+function renderAgentHeader(
+  agent: AgentsListResult["agents"][number],
+  defaultId: string | null,
+  agentIdentity: AgentIdentityResult | null,
 ) {
+  const badge = agentBadgeText(agent.id, defaultId);
+  const displayName = normalizeAgentLabel(agent);
+  const subtitle = agent.identity?.theme?.trim() || t("agentsPage.headerSubtitle");
+  const emoji = resolveAgentEmoji(agent, agentIdentity);
+  return html`
+    <section class="card agent-header">
+      <div class="agent-header-main">
+        <div class="agent-avatar agent-avatar--lg">${emoji || displayName.slice(0, 1)}</div>
+        <div>
+          <div class="card-title">${displayName}</div>
+          <div class="card-sub">${subtitle}</div>
+        </div>
+      </div>
+      <div class="agent-header-meta">
+        <div class="mono">${agent.id}</div>
+        ${badge ? html`<span class="agent-pill">${badge}</span>` : nothing}
+      </div>
+    </section>
+  `;
+}
+
+function renderAgentTabs(active: AgentsPanel, onSelect: (panel: AgentsPanel) => void) {
   const tabs: Array<{ id: AgentsPanel; label: string }> = [
-    { id: "overview", label: "Overview" },
-    { id: "files", label: "Files" },
-    { id: "tools", label: "Tools" },
-    { id: "skills", label: "Skills" },
-    { id: "channels", label: "Channels" },
-    { id: "cron", label: "Cron Jobs" },
+    { id: "overview", label: t("agentsPage.tabs.overview") },
+    { id: "files", label: t("agentsPage.tabs.files") },
+    { id: "tools", label: t("agentsPage.tabs.tools") },
+    { id: "skills", label: t("agentsPage.tabs.skills") },
+    { id: "channels", label: t("agentsPage.tabs.channels") },
+    { id: "cron", label: t("agentsPage.tabs.cron") },
   ];
   return html`
     <div class="agent-tabs">
@@ -372,10 +353,178 @@ function renderAgentTabs(
             type="button"
             @click=${() => onSelect(tab.id)}
           >
-            ${tab.label}${counts[tab.id] != null ? html`<span class="agent-tab-count">${counts[tab.id]}</span>` : nothing}
+            ${tab.label}
           </button>
         `,
       )}
     </div>
+  `;
+}
+
+function renderAgentOverview(params: {
+  agent: AgentsListResult["agents"][number];
+  basePath: string;
+  defaultId: string | null;
+  configForm: Record<string, unknown> | null;
+  agentFilesList: AgentsFilesListResult | null;
+  agentIdentity: AgentIdentityResult | null;
+  agentIdentityLoading: boolean;
+  agentIdentityError: string | null;
+  configLoading: boolean;
+  configSaving: boolean;
+  configDirty: boolean;
+  onConfigReload: () => void;
+  onConfigSave: () => void;
+  onModelChange: (agentId: string, modelId: string | null) => void;
+  onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
+  onSelectPanel: (panel: AgentsPanel) => void;
+}) {
+  const {
+    agent,
+    configForm,
+    agentFilesList,
+    agentIdentity,
+    agentIdentityLoading,
+    agentIdentityError,
+    configLoading,
+    configSaving,
+    configDirty,
+    onConfigReload,
+    onConfigSave,
+    onModelChange,
+    onModelFallbacksChange,
+  } = params;
+  const config = resolveAgentConfig(configForm, agent.id);
+  const workspaceFromFiles =
+    agentFilesList && agentFilesList.agentId === agent.id ? agentFilesList.workspace : null;
+  const workspace =
+    workspaceFromFiles ||
+    config.entry?.workspace ||
+    config.defaults?.workspace ||
+    t("agentsPage.defaultWorkspace");
+  const model = config.entry?.model
+    ? resolveModelLabel(config.entry?.model)
+    : resolveModelLabel(config.defaults?.model);
+  const defaultModel = resolveModelLabel(config.defaults?.model);
+  const modelPrimary =
+    resolveModelPrimary(config.entry?.model) ||
+    (typeof config.entry?.model === "string" ? config.entry.model.trim() || null : null);
+  const defaultPrimary =
+    resolveModelPrimary(config.defaults?.model) ||
+    (typeof config.defaults?.model === "string" ? config.defaults.model.trim() || null : null);
+  const effectivePrimary = modelPrimary ?? defaultPrimary ?? null;
+  const modelFallbacks = resolveEffectiveModelFallbacks(
+    config.entry?.model,
+    config.defaults?.model,
+  );
+  const fallbackText = modelFallbacks ? modelFallbacks.join(", ") : "";
+  const identityName =
+    agentIdentity?.name?.trim() ||
+    agent.identity?.name?.trim() ||
+    agent.name?.trim() ||
+    config.entry?.name ||
+    "-";
+  const resolvedEmoji = resolveAgentEmoji(agent, agentIdentity);
+  const identityEmoji = resolvedEmoji || "-";
+  const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
+  const skillCount = skillFilter?.length ?? null;
+  const identityStatus = agentIdentityLoading
+    ? t("agentsPage.loading")
+    : agentIdentityError
+      ? t("agentsPage.unavailable")
+      : "";
+  const isDefault = Boolean(params.defaultId && agent.id === params.defaultId);
+
+  return html`
+    <section class="card">
+      <div class="card-title">${t("agentsPage.overview.title")}</div>
+      <div class="card-sub">${t("agentsPage.overview.subtitle")}</div>
+      <div class="agents-overview-grid" style="margin-top: 16px;">
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.workspace")}</div>
+          <div class="mono">${workspace}</div>
+        </div>
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.primaryModel")}</div>
+          <div class="mono">${model}</div>
+        </div>
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.identityName")}</div>
+          <div>${identityName}</div>
+          ${identityStatus ? html`<div class="agent-kv-sub muted">${identityStatus}</div>` : nothing}
+        </div>
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.default")}</div>
+          <div>${isDefault ? t("common.yes") : t("common.no")}</div>
+        </div>
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.identityEmoji")}</div>
+          <div>${identityEmoji}</div>
+        </div>
+        <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.skillsFilter")}</div>
+          <div>${skillFilter
+            ? t("agentsPage.skills.selectedCount", { count: String(skillCount) })
+            : t("agentsPage.skills.all")}</div>
+        </div>
+      </div>
+
+      <div class="agent-model-select" style="margin-top: 20px;">
+        <div class="label">${t("agentsPage.overview.modelSelection")}</div>
+        <div class="row" style="gap: 12px; flex-wrap: wrap;">
+          <label class="field" style="min-width: 260px; flex: 1;">
+            <span>${isDefault
+              ? t("agentsPage.overview.primaryModelDefault")
+              : t("agentsPage.overview.primaryModelPlain")}</span>
+            <select
+              .value=${effectivePrimary ?? ""}
+              ?disabled=${!configForm || configLoading || configSaving}
+              @change=${(e: Event) =>
+                onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
+            >
+              ${
+                isDefault
+                  ? nothing
+                  : html`
+                      <option value="">
+                        ${defaultPrimary
+                          ? t("agentsPage.overview.inheritDefaultWithValue", {
+                              value: defaultPrimary,
+                            })
+                          : t("agentsPage.overview.inheritDefault")}
+                      </option>
+                    `
+              }
+              ${buildModelOptions(configForm, effectivePrimary ?? undefined)}
+            </select>
+          </label>
+          <label class="field" style="min-width: 260px; flex: 1;">
+            <span>${t("agentsPage.overview.fallbacks")}</span>
+            <input
+              .value=${fallbackText}
+              ?disabled=${!configForm || configLoading || configSaving}
+              placeholder=${t("agentsPage.overview.fallbacksPlaceholder")}
+              @input=${(e: Event) =>
+                onModelFallbacksChange(
+                  agent.id,
+                  parseFallbackList((e.target as HTMLInputElement).value),
+                )}
+            />
+          </label>
+        </div>
+        <div class="row" style="justify-content: flex-end; gap: 8px;">
+          <button class="btn btn--sm" ?disabled=${configLoading} @click=${onConfigReload}>
+            ${t("agentsPage.reloadConfig")}
+          </button>
+          <button
+            class="btn btn--sm primary"
+            ?disabled=${configSaving || !configDirty}
+            @click=${onConfigSave}
+          >
+            ${configSaving ? t("agentsPage.saving") : t("common.save")}
+          </button>
+        </div>
+      </div>
+    </section>
   `;
 }
