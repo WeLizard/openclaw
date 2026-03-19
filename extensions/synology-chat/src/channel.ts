@@ -5,9 +5,18 @@
  */
 
 import {
-  createHybridChannelConfigBase,
+  createHybridChannelConfigAdapter,
   createScopedDmSecurityResolver,
 } from "openclaw/plugin-sdk/channel-config-helpers";
+import {
+  createConditionalWarningCollector,
+  projectWarningCollector,
+} from "openclaw/plugin-sdk/channel-policy";
+import {
+  attachChannelToResult,
+  createEmptyChannelDirectoryAdapter,
+  createTextPairingAdapter,
+} from "openclaw/plugin-sdk/channel-runtime";
 import { z } from "zod";
 import { DEFAULT_ACCOUNT_ID, registerPluginHttpRoute, buildChannelConfigSchema } from "../api.js";
 import { listAccountIds, resolveAccount } from "./accounts.js";
@@ -32,7 +41,7 @@ const resolveSynologyChatDmPolicy = createScopedDmSecurityResolver<ResolvedSynol
   normalizeEntry: (raw) => raw.toLowerCase().trim(),
 });
 
-const synologyChatConfigBase = createHybridChannelConfigBase<ResolvedSynologyChatAccount>({
+const synologyChatConfigAdapter = createHybridChannelConfigAdapter<ResolvedSynologyChatAccount>({
   sectionKey: CHANNEL_ID,
   listAccountIds: (cfg: any) => listAccountIds(cfg),
   resolveAccount: (cfg: any, accountId?: string | null) => resolveAccount(cfg, accountId),
@@ -48,7 +57,30 @@ const synologyChatConfigBase = createHybridChannelConfigBase<ResolvedSynologyCha
     "botName",
     "allowInsecureSsl",
   ],
+  resolveAllowFrom: (account) => account.allowedUserIds,
+  formatAllowFrom: (allowFrom) =>
+    allowFrom.map((entry) => String(entry).trim().toLowerCase()).filter(Boolean),
 });
+
+const collectSynologyChatSecurityWarnings =
+  createConditionalWarningCollector<ResolvedSynologyChatAccount>(
+    (account) =>
+      !account.token &&
+      "- Synology Chat: token is not configured. The webhook will reject all requests.",
+    (account) =>
+      !account.incomingUrl &&
+      "- Synology Chat: incomingUrl is not configured. The bot cannot send replies.",
+    (account) =>
+      account.allowInsecureSsl &&
+      "- Synology Chat: SSL verification is disabled (allowInsecureSsl=true). Only use this for local NAS with self-signed certificates.",
+    (account) =>
+      account.dmPolicy === "open" &&
+      '- Synology Chat: dmPolicy="open" allows any user to message the bot. Consider "allowlist" for production use.',
+    (account) =>
+      account.dmPolicy === "allowlist" &&
+      account.allowedUserIds.length === 0 &&
+      '- Synology Chat: dmPolicy="allowlist" with empty allowedUserIds blocks all senders. Add users or set dmPolicy="open".',
+  );
 
 function waitUntilAbort(signal?: AbortSignal, onAbort?: () => void): Promise<void> {
   return new Promise((resolve) => {
@@ -100,55 +132,26 @@ export function createSynologyChatPlugin() {
     setupWizard: synologyChatSetupWizard,
 
     config: {
-      ...synologyChatConfigBase,
+      ...synologyChatConfigAdapter,
     },
 
-    pairing: {
+    pairing: createTextPairingAdapter({
       idLabel: "synologyChatUserId",
+      message: "OpenClaw: your access has been approved.",
       normalizeAllowEntry: (entry: string) => entry.toLowerCase().trim(),
-      notifyApproval: async ({ cfg, id }: { cfg: any; id: string }) => {
+      notify: async ({ cfg, id, message }) => {
         const account = resolveAccount(cfg);
         if (!account.incomingUrl) return;
-        await sendMessage(
-          account.incomingUrl,
-          "OpenClaw: your access has been approved.",
-          id,
-          account.allowInsecureSsl,
-        );
+        await sendMessage(account.incomingUrl, message, id, account.allowInsecureSsl);
       },
-    },
+    }),
 
     security: {
       resolveDmPolicy: resolveSynologyChatDmPolicy,
-      collectWarnings: ({ account }: { account: ResolvedSynologyChatAccount }) => {
-        const warnings: string[] = [];
-        if (!account.token) {
-          warnings.push(
-            "- Synology Chat: token is not configured. The webhook will reject all requests.",
-          );
-        }
-        if (!account.incomingUrl) {
-          warnings.push(
-            "- Synology Chat: incomingUrl is not configured. The bot cannot send replies.",
-          );
-        }
-        if (account.allowInsecureSsl) {
-          warnings.push(
-            "- Synology Chat: SSL verification is disabled (allowInsecureSsl=true). Only use this for local NAS with self-signed certificates.",
-          );
-        }
-        if (account.dmPolicy === "open") {
-          warnings.push(
-            '- Synology Chat: dmPolicy="open" allows any user to message the bot. Consider "allowlist" for production use.',
-          );
-        }
-        if (account.dmPolicy === "allowlist" && account.allowedUserIds.length === 0) {
-          warnings.push(
-            '- Synology Chat: dmPolicy="allowlist" with empty allowedUserIds blocks all senders. Add users or set dmPolicy="open".',
-          );
-        }
-        return warnings;
-      },
+      collectWarnings: projectWarningCollector(
+        ({ account }: { account: ResolvedSynologyChatAccount }) => account,
+        collectSynologyChatSecurityWarnings,
+      ),
     },
 
     messaging: {
@@ -169,11 +172,7 @@ export function createSynologyChatPlugin() {
       },
     },
 
-    directory: {
-      self: async () => null,
-      listPeers: async () => [],
-      listGroups: async () => [],
-    },
+    directory: createEmptyChannelDirectoryAdapter(),
 
     outbound: {
       deliveryMode: "gateway" as const,
@@ -190,7 +189,7 @@ export function createSynologyChatPlugin() {
         if (!ok) {
           throw new Error("Failed to send message to Synology Chat");
         }
-        return { channel: CHANNEL_ID, messageId: `sc-${Date.now()}`, chatId: to };
+        return attachChannelToResult(CHANNEL_ID, { messageId: `sc-${Date.now()}`, chatId: to });
       },
 
       sendMedia: async ({ to, mediaUrl, accountId, cfg }: any) => {
@@ -207,7 +206,7 @@ export function createSynologyChatPlugin() {
         if (!ok) {
           throw new Error("Failed to send media to Synology Chat");
         }
-        return { channel: CHANNEL_ID, messageId: `sc-${Date.now()}`, chatId: to };
+        return attachChannelToResult(CHANNEL_ID, { messageId: `sc-${Date.now()}`, chatId: to });
       },
     },
 

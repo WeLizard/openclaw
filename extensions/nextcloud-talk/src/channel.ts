@@ -1,15 +1,16 @@
 import { formatAllowFromLowercase } from "openclaw/plugin-sdk/allow-from";
 import {
-  createScopedAccountConfigAccessors,
-  createScopedChannelConfigBase,
+  createScopedChannelConfigAdapter,
   createScopedDmSecurityResolver,
 } from "openclaw/plugin-sdk/channel-config-helpers";
 import { createAccountStatusSink } from "openclaw/plugin-sdk/channel-lifecycle";
+import { createAllowlistProviderRouteAllowlistWarningCollector } from "openclaw/plugin-sdk/channel-policy";
 import {
-  collectAllowlistProviderGroupPolicyWarnings,
-  collectOpenGroupPolicyRouteAllowlistWarnings,
-} from "openclaw/plugin-sdk/channel-policy";
-import { runStoppablePassiveMonitor } from "../../shared/passive-monitor.js";
+  createAttachedChannelResultAdapter,
+  createLoggedPairingApprovalNotifier,
+  createPairingPrefixStripper,
+} from "openclaw/plugin-sdk/channel-runtime";
+import { runStoppablePassiveMonitor } from "openclaw/plugin-sdk/extension-shared";
 import {
   buildBaseChannelStatusSummary,
   buildChannelConfigSchema,
@@ -34,6 +35,7 @@ import {
 import { resolveNextcloudTalkGroupToolPolicy } from "./policy.js";
 import { getNextcloudTalkRuntime } from "./runtime.js";
 import { sendMessageNextcloudTalk } from "./send.js";
+import { resolveNextcloudTalkOutboundSessionRoute } from "./session-route.js";
 import { nextcloudTalkSetupAdapter } from "./setup-core.js";
 import { nextcloudTalkSetupWizard } from "./setup-surface.js";
 import type { CoreConfig } from "./types.js";
@@ -50,19 +52,8 @@ const meta = {
   quickstartAllowFrom: true,
 };
 
-const nextcloudTalkConfigAccessors =
-  createScopedAccountConfigAccessors<ResolvedNextcloudTalkAccount>({
-    resolveAccount: ({ cfg, accountId }) =>
-      resolveNextcloudTalkAccount({ cfg: cfg as CoreConfig, accountId }),
-    resolveAllowFrom: (account) => account.config.allowFrom,
-    formatAllowFrom: (allowFrom) =>
-      formatAllowFromLowercase({
-        allowFrom,
-        stripPrefixRe: /^(nextcloud-talk|nc-talk|nc):/i,
-      }),
-  });
-
-const nextcloudTalkConfigBase = createScopedChannelConfigBase<
+const nextcloudTalkConfigAdapter = createScopedChannelConfigAdapter<
+  ResolvedNextcloudTalkAccount,
   ResolvedNextcloudTalkAccount,
   CoreConfig
 >({
@@ -71,6 +62,12 @@ const nextcloudTalkConfigBase = createScopedChannelConfigBase<
   resolveAccount: (cfg, accountId) => resolveNextcloudTalkAccount({ cfg, accountId }),
   defaultAccountId: resolveDefaultNextcloudTalkAccountId,
   clearBaseFields: ["botSecret", "botSecretFile", "baseUrl", "name"],
+  resolveAllowFrom: (account) => account.config.allowFrom,
+  formatAllowFrom: (allowFrom) =>
+    formatAllowFromLowercase({
+      allowFrom,
+      stripPrefixRe: /^(nextcloud-talk|nc-talk|nc):/i,
+    }),
 });
 
 const resolveNextcloudTalkDmPolicy = createScopedDmSecurityResolver<ResolvedNextcloudTalkAccount>({
@@ -81,17 +78,40 @@ const resolveNextcloudTalkDmPolicy = createScopedDmSecurityResolver<ResolvedNext
   normalizeEntry: (raw) => raw.replace(/^(nextcloud-talk|nc-talk|nc):/i, "").toLowerCase(),
 });
 
+const collectNextcloudTalkSecurityWarnings =
+  createAllowlistProviderRouteAllowlistWarningCollector<ResolvedNextcloudTalkAccount>({
+    providerConfigPresent: (cfg) =>
+      (cfg.channels as Record<string, unknown> | undefined)?.["nextcloud-talk"] !== undefined,
+    resolveGroupPolicy: (account) => account.config.groupPolicy,
+    resolveRouteAllowlistConfigured: (account) =>
+      Boolean(account.config.rooms) && Object.keys(account.config.rooms ?? {}).length > 0,
+    restrictSenders: {
+      surface: "Nextcloud Talk rooms",
+      openScope: "any member in allowed rooms",
+      groupPolicyPath: "channels.nextcloud-talk.groupPolicy",
+      groupAllowFromPath: "channels.nextcloud-talk.groupAllowFrom",
+    },
+    noRouteAllowlist: {
+      surface: "Nextcloud Talk rooms",
+      routeAllowlistPath: "channels.nextcloud-talk.rooms",
+      routeScope: "room",
+      groupPolicyPath: "channels.nextcloud-talk.groupPolicy",
+      groupAllowFromPath: "channels.nextcloud-talk.groupAllowFrom",
+    },
+  });
+
 export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = {
   id: "nextcloud-talk",
   meta,
   setupWizard: nextcloudTalkSetupWizard,
   pairing: {
     idLabel: "nextcloudUserId",
-    normalizeAllowEntry: (entry) =>
-      entry.replace(/^(nextcloud-talk|nc-talk|nc):/i, "").toLowerCase(),
-    notifyApproval: async ({ id }) => {
-      console.log(`[nextcloud-talk] User ${id} approved for pairing`);
-    },
+    normalizeAllowEntry: createPairingPrefixStripper(/^(nextcloud-talk|nc-talk|nc):/i, (entry) =>
+      entry.toLowerCase(),
+    ),
+    notifyApproval: createLoggedPairingApprovalNotifier(
+      ({ id }) => `[nextcloud-talk] User ${id} approved for pairing`,
+    ),
   },
   capabilities: {
     chatTypes: ["direct", "group"],
@@ -104,7 +124,7 @@ export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = 
   reload: { configPrefixes: ["channels.nextcloud-talk"] },
   configSchema: buildChannelConfigSchema(NextcloudTalkConfigSchema),
   config: {
-    ...nextcloudTalkConfigBase,
+    ...nextcloudTalkConfigAdapter,
     isConfigured: (account) => Boolean(account.secret?.trim() && account.baseUrl?.trim()),
     describeAccount: (account) => ({
       accountId: account.accountId,
@@ -114,38 +134,10 @@ export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = 
       secretSource: account.secretSource,
       baseUrl: account.baseUrl ? "[set]" : "[missing]",
     }),
-    ...nextcloudTalkConfigAccessors,
   },
   security: {
     resolveDmPolicy: resolveNextcloudTalkDmPolicy,
-    collectWarnings: ({ account, cfg }) => {
-      const roomAllowlistConfigured =
-        account.config.rooms && Object.keys(account.config.rooms).length > 0;
-      return collectAllowlistProviderGroupPolicyWarnings({
-        cfg,
-        providerConfigPresent:
-          (cfg.channels as Record<string, unknown> | undefined)?.["nextcloud-talk"] !== undefined,
-        configuredGroupPolicy: account.config.groupPolicy,
-        collect: (groupPolicy) =>
-          collectOpenGroupPolicyRouteAllowlistWarnings({
-            groupPolicy,
-            routeAllowlistConfigured: Boolean(roomAllowlistConfigured),
-            restrictSenders: {
-              surface: "Nextcloud Talk rooms",
-              openScope: "any member in allowed rooms",
-              groupPolicyPath: "channels.nextcloud-talk.groupPolicy",
-              groupAllowFromPath: "channels.nextcloud-talk.groupAllowFrom",
-            },
-            noRouteAllowlist: {
-              surface: "Nextcloud Talk rooms",
-              routeAllowlistPath: "channels.nextcloud-talk.rooms",
-              routeScope: "room",
-              groupPolicyPath: "channels.nextcloud-talk.groupPolicy",
-              groupAllowFromPath: "channels.nextcloud-talk.groupAllowFrom",
-            },
-          }),
-      });
-    },
+    collectWarnings: collectNextcloudTalkSecurityWarnings,
   },
   groups: {
     resolveRequireMention: ({ cfg, accountId, groupId }) => {
@@ -171,6 +163,7 @@ export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = 
   },
   messaging: {
     normalizeTarget: normalizeNextcloudTalkMessagingTarget,
+    resolveOutboundSessionRoute: (params) => resolveNextcloudTalkOutboundSessionRoute(params),
     targetResolver: {
       looksLikeId: looksLikeNextcloudTalkTargetId,
       hint: "<roomToken>",
@@ -182,23 +175,21 @@ export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = 
     chunker: (text, limit) => getNextcloudTalkRuntime().channel.text.chunkMarkdownText(text, limit),
     chunkerMode: "markdown",
     textChunkLimit: 4000,
-    sendText: async ({ cfg, to, text, accountId, replyToId }) => {
-      const result = await sendMessageNextcloudTalk(to, text, {
-        accountId: accountId ?? undefined,
-        replyTo: replyToId ?? undefined,
-        cfg: cfg as CoreConfig,
-      });
-      return { channel: "nextcloud-talk", ...result };
-    },
-    sendMedia: async ({ cfg, to, text, mediaUrl, accountId, replyToId }) => {
-      const messageWithMedia = mediaUrl ? `${text}\n\nAttachment: ${mediaUrl}` : text;
-      const result = await sendMessageNextcloudTalk(to, messageWithMedia, {
-        accountId: accountId ?? undefined,
-        replyTo: replyToId ?? undefined,
-        cfg: cfg as CoreConfig,
-      });
-      return { channel: "nextcloud-talk", ...result };
-    },
+    ...createAttachedChannelResultAdapter({
+      channel: "nextcloud-talk",
+      sendText: async ({ cfg, to, text, accountId, replyToId }) =>
+        await sendMessageNextcloudTalk(to, text, {
+          accountId: accountId ?? undefined,
+          replyTo: replyToId ?? undefined,
+          cfg: cfg as CoreConfig,
+        }),
+      sendMedia: async ({ cfg, to, text, mediaUrl, accountId, replyToId }) =>
+        await sendMessageNextcloudTalk(to, mediaUrl ? `${text}\n\nAttachment: ${mediaUrl}` : text, {
+          accountId: accountId ?? undefined,
+          replyTo: replyToId ?? undefined,
+          cfg: cfg as CoreConfig,
+        }),
+    }),
   },
   status: {
     defaultRuntime: {

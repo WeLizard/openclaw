@@ -1,8 +1,13 @@
-import { createHybridChannelConfigBase } from "openclaw/plugin-sdk/channel-config-helpers";
-import type { ChannelAccountSnapshot, ChannelPlugin } from "openclaw/plugin-sdk/channel-runtime";
+import { createHybridChannelConfigAdapter } from "openclaw/plugin-sdk/channel-config-helpers";
+import {
+  createRuntimeOutboundDelegates,
+  type ChannelAccountSnapshot,
+  type ChannelPlugin,
+} from "openclaw/plugin-sdk/channel-runtime";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { createLazyRuntimeModule } from "openclaw/plugin-sdk/lazy-runtime";
 import { tlonChannelConfigSchema } from "./config-schema.js";
+import { resolveTlonOutboundSessionRoute } from "./session-route.js";
 import {
   applyTlonSetupConfig,
   createTlonSetupWizardBase,
@@ -38,7 +43,7 @@ const tlonSetupWizardProxy = createTlonSetupWizardBase({
     ).tlonSetupWizard.finalize!(params),
 }) satisfies NonNullable<ChannelPlugin["setupWizard"]>;
 
-const tlonConfigBase = createHybridChannelConfigBase({
+const tlonConfigAdapter = createHybridChannelConfigAdapter({
   sectionKey: TLON_CHANNEL_ID,
   listAccountIds: (cfg: OpenClawConfig) => listTlonAccountIds(cfg),
   resolveAccount: (cfg: OpenClawConfig, accountId?: string | null) =>
@@ -46,6 +51,9 @@ const tlonConfigBase = createHybridChannelConfigBase({
   defaultAccountId: () => "default",
   clearBaseFields: ["ship", "code", "url", "name"],
   preserveSectionOnDefaultDelete: true,
+  resolveAllowFrom: (account) => account.dmAllowlist,
+  formatAllowFrom: (allowFrom) =>
+    allowFrom.map((entry) => normalizeShip(String(entry))).filter(Boolean),
 });
 
 export const tlonPlugin: ChannelPlugin = {
@@ -71,7 +79,7 @@ export const tlonPlugin: ChannelPlugin = {
   reload: { configPrefixes: ["channels.tlon"] },
   configSchema: tlonChannelConfigSchema,
   config: {
-    ...tlonConfigBase,
+    ...tlonConfigAdapter,
     isConfigured: (account) => account.configured,
     describeAccount: (account) => ({
       accountId: account.accountId,
@@ -97,19 +105,17 @@ export const tlonPlugin: ChannelPlugin = {
       looksLikeId: (target) => Boolean(parseTlonTarget(target)),
       hint: formatTargetHint(),
     },
+    resolveOutboundSessionRoute: (params) => resolveTlonOutboundSessionRoute(params),
   },
   outbound: {
     deliveryMode: "direct",
     textChunkLimit: 10000,
     resolveTarget: ({ to }) => resolveTlonOutboundTarget(to),
-    sendText: async (params) =>
-      await (
-        await loadTlonChannelRuntime()
-      ).tlonRuntimeOutbound.sendText!(params),
-    sendMedia: async (params) =>
-      await (
-        await loadTlonChannelRuntime()
-      ).tlonRuntimeOutbound.sendMedia!(params),
+    ...createRuntimeOutboundDelegates({
+      getRuntime: loadTlonChannelRuntime,
+      sendText: { resolve: (runtime) => runtime.tlonRuntimeOutbound.sendText },
+      sendMedia: { resolve: (runtime) => runtime.tlonRuntimeOutbound.sendMedia },
+    }),
   },
   status: {
     defaultRuntime: {

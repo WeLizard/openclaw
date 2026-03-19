@@ -9,9 +9,8 @@ import {
   buildAgentMediaPayload,
   buildModelsProviderData,
   DM_GROUP_ACCESS_REASON,
-  createScopedPairingAccess,
-  createReplyPrefixOptions,
-  createTypingCallbacks,
+  createChannelPairingController,
+  createChannelReplyPipeline,
   logInboundDrop,
   logTypingFailure,
   buildPendingHistoryContextFromMap,
@@ -44,7 +43,6 @@ import {
   type MattermostUser,
 } from "./client.js";
 import {
-  buildButtonProps,
   computeInteractionCallbackUrl,
   createMattermostInteractionHandler,
   resolveInteractionCallbackPath,
@@ -75,6 +73,7 @@ import {
   resolveThreadSessionKeys,
 } from "./monitor-helpers.js";
 import { resolveOncharPrefixes, stripOncharPrefix } from "./monitor-onchar.js";
+import { createMattermostMonitorResources, type MattermostMediaInfo } from "./monitor-resources.js";
 import { registerMattermostMonitorSlashCommands } from "./monitor-slash.js";
 import {
   createMattermostConnectOnce,
@@ -117,8 +116,6 @@ type MattermostReaction = {
 };
 const RECENT_MATTERMOST_MESSAGE_TTL_MS = 5 * 60_000;
 const RECENT_MATTERMOST_MESSAGE_MAX = 2000;
-const CHANNEL_CACHE_TTL_MS = 5 * 60_000;
-const USER_CACHE_TTL_MS = 10 * 60_000;
 
 function isLoopbackHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
@@ -215,12 +212,6 @@ export function resolveMattermostThreadSessionContext(params: {
     parentSessionKey: threadKeys.parentSessionKey,
   };
 }
-type MattermostMediaInfo = {
-  path: string;
-  contentType?: string;
-  kind: MediaKind;
-};
-
 function buildMattermostAttachmentPlaceholder(mediaList: MattermostMediaInfo[]): string {
   if (mediaList.length === 0) {
     return "";
@@ -253,7 +244,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     cfg,
     accountId: opts.accountId,
   });
-  const pairing = createScopedPairingAccess({
+  const pairing = createChannelPairingController({
     core,
     channel: "mattermost",
     accountId: account.accountId,
@@ -277,7 +268,6 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
   const botUserId = botUser.id;
   const botUsername = botUser.username?.trim() || undefined;
   runtime.log?.(`mattermost connected as ${botUsername ? `@${botUsername}` : botUserId}`);
-
   await registerMattermostMonitorSlashCommands({
     client,
     cfg,
@@ -286,6 +276,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     baseUrl,
     botUserId,
   });
+  const slashEnabled = getSlashCommandState(account.accountId) != null;
 
   // ─── Interactive buttons registration ──────────────────────────────────────
   // Derive a stable HMAC secret from the bot token so CLI and gateway share it.
@@ -470,26 +461,26 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
           channel: "mattermost",
           accountId: account.accountId,
         });
-        const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
+        const { onModelSelected, typingCallbacks, ...replyPipeline } = createChannelReplyPipeline({
           cfg,
           agentId: route.agentId,
           channel: "mattermost",
           accountId: account.accountId,
-        });
-        const typingCallbacks = createTypingCallbacks({
-          start: () => sendTypingIndicator(opts.channelId, threadContext.effectiveReplyToId),
-          onStartError: (err) => {
-            logTypingFailure({
-              log: (message) => logger.debug?.(message),
-              channel: "mattermost",
-              target: opts.channelId,
-              error: err,
-            });
+          typing: {
+            start: () => sendTypingIndicator(opts.channelId, threadContext.effectiveReplyToId),
+            onStartError: (err) => {
+              logTypingFailure({
+                log: (message) => logger.debug?.(message),
+                channel: "mattermost",
+                target: opts.channelId,
+                error: err,
+              });
+            },
           },
         });
         const { dispatcher, replyOptions, markDispatchIdle } =
           core.channel.reply.createReplyDispatcherWithTyping({
-            ...prefixOptions,
+            ...replyPipeline,
             humanDelay: core.channel.reply.resolveHumanDelayConfig(cfg, route.agentId),
             deliver: async (payload: ReplyPayload) => {
               await deliverMattermostReplyPayload({
@@ -512,7 +503,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             onError: (err, info) => {
               runtime.error?.(`mattermost button-click ${info.kind} reply failed: ${String(err)}`);
             },
-            onReplyStart: typingCallbacks.onReplyStart,
+            onReplyStart: typingCallbacks?.onReplyStart,
           });
 
         await core.channel.reply.dispatchReplyFromConfig({
@@ -536,8 +527,6 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     log: (msg: string) => runtime.log?.(msg),
   });
 
-  const channelCache = new Map<string, { value: MattermostChannel | null; expiresAt: number }>();
-  const userCache = new Map<string, { value: MattermostUser | null; expiresAt: number }>();
   const logger = core.logging.getChildLogger({ module: "mattermost" });
   const logVerboseMessage = (message: string) => {
     if (!core.logging.shouldLogVerbose()) {
@@ -570,123 +559,25 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     log: (message) => logVerboseMessage(message),
   });
 
-  const resolveMattermostMedia = async (
-    fileIds?: string[] | null,
-  ): Promise<MattermostMediaInfo[]> => {
-    const ids = (fileIds ?? []).map((id) => id?.trim()).filter(Boolean);
-    if (ids.length === 0) {
-      return [];
-    }
-    const out: MattermostMediaInfo[] = [];
-    for (const fileId of ids) {
-      try {
-        const fetched = await core.channel.media.fetchRemoteMedia({
-          url: `${client.apiBaseUrl}/files/${fileId}`,
-          requestInit: {
-            headers: {
-              Authorization: `Bearer ${client.token}`,
-            },
-          },
-          filePathHint: fileId,
-          maxBytes: mediaMaxBytes,
-          // Allow fetching from the Mattermost server host (may be localhost or
-          // a private IP). Without this, SSRF guards block media downloads.
-          // Credit: #22594 (@webclerk)
-          ssrfPolicy: { allowedHostnames: [new URL(client.baseUrl).hostname] },
-        });
-        const saved = await core.channel.media.saveMediaBuffer(
-          fetched.buffer,
-          fetched.contentType ?? undefined,
-          "inbound",
-          mediaMaxBytes,
-        );
-        const contentType = saved.contentType ?? fetched.contentType ?? undefined;
-        out.push({
-          path: saved.path,
-          contentType,
-          kind: core.media.mediaKindFromMime(contentType) ?? "unknown",
-        });
-      } catch (err) {
-        logger.debug?.(`mattermost: failed to download file ${fileId}: ${String(err)}`);
-      }
-    }
-    return out;
-  };
-
-  const sendTypingIndicator = async (channelId: string, parentId?: string) => {
-    await sendMattermostTyping(client, { channelId, parentId });
-  };
-
-  const resolveChannelInfo = async (channelId: string): Promise<MattermostChannel | null> => {
-    const cached = channelCache.get(channelId);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.value;
-    }
-    try {
-      const info = await fetchMattermostChannel(client, channelId);
-      channelCache.set(channelId, {
-        value: info,
-        expiresAt: Date.now() + CHANNEL_CACHE_TTL_MS,
-      });
-      return info;
-    } catch (err) {
-      logger.debug?.(`mattermost: channel lookup failed: ${String(err)}`);
-      channelCache.set(channelId, {
-        value: null,
-        expiresAt: Date.now() + CHANNEL_CACHE_TTL_MS,
-      });
-      return null;
-    }
-  };
-
-  const resolveUserInfo = async (userId: string): Promise<MattermostUser | null> => {
-    const cached = userCache.get(userId);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.value;
-    }
-    try {
-      const info = await fetchMattermostUser(client, userId);
-      userCache.set(userId, {
-        value: info,
-        expiresAt: Date.now() + USER_CACHE_TTL_MS,
-      });
-      return info;
-    } catch (err) {
-      logger.debug?.(`mattermost: user lookup failed: ${String(err)}`);
-      userCache.set(userId, {
-        value: null,
-        expiresAt: Date.now() + USER_CACHE_TTL_MS,
-      });
-      return null;
-    }
-  };
-
-  const buildModelPickerProps = (
-    channelId: string,
-    buttons: Array<unknown>,
-  ): Record<string, unknown> | undefined =>
-    buildButtonProps({
-      callbackUrl,
-      accountId: account.accountId,
-      channelId,
-      buttons,
-    });
-
-  const updateModelPickerPost = async (params: {
-    channelId: string;
-    postId: string;
-    message: string;
-    buttons?: Array<unknown>;
-  }): Promise<MattermostInteractionResponse> => {
-    const props = buildModelPickerProps(params.channelId, params.buttons ?? []) ?? {
-      attachments: [],
-    };
-    await updateMattermostPost(client, params.postId, {
-      message: params.message,
-      props,
-    });
-    return {};
-  };
+  const {
+    resolveMattermostMedia,
+    sendTypingIndicator,
+    resolveChannelInfo,
+    resolveUserInfo,
+    updateModelPickerPost,
+  } = createMattermostMonitorResources({
+    accountId: account.accountId,
+    callbackUrl,
+    client,
+    logger: {
+      debug: (message) => logger.debug?.(String(message)),
+    },
+    mediaMaxBytes,
+    fetchRemoteMedia: (params) => core.channel.media.fetchRemoteMedia(params),
+    saveMediaBuffer: (buffer, contentType, direction, maxBytes) =>
+      core.channel.media.saveMediaBuffer(Buffer.from(buffer), contentType, direction, maxBytes),
+    mediaKindFromMime: (contentType) => core.media.mediaKindFromMime(contentType) as MediaKind,
+  });
 
   const runModelPickerCommand = async (params: {
     commandText: string;
@@ -761,30 +652,30 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
         fallbackLimit: account.textChunkLimit ?? 4000,
       },
     );
-    const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
+    const shouldDeliverReplies = params.deliverReplies === true;
+    const { onModelSelected, typingCallbacks, ...replyPipeline } = createChannelReplyPipeline({
       cfg,
       agentId: params.route.agentId,
       channel: "mattermost",
       accountId: account.accountId,
+      typing: shouldDeliverReplies
+        ? {
+            start: () => sendTypingIndicator(params.channelId, params.effectiveReplyToId),
+            onStartError: (err) => {
+              logTypingFailure({
+                log: (message) => logger.debug?.(message),
+                channel: "mattermost",
+                target: params.channelId,
+                error: err,
+              });
+            },
+          }
+        : undefined,
     });
-    const shouldDeliverReplies = params.deliverReplies === true;
     const capturedTexts: string[] = [];
-    const typingCallbacks = shouldDeliverReplies
-      ? createTypingCallbacks({
-          start: () => sendTypingIndicator(params.channelId, params.effectiveReplyToId),
-          onStartError: (err) => {
-            logTypingFailure({
-              log: (message) => logger.debug?.(message),
-              channel: "mattermost",
-              target: params.channelId,
-              error: err,
-            });
-          },
-        })
-      : undefined;
     const { dispatcher, replyOptions, markDispatchIdle } =
       core.channel.reply.createReplyDispatcherWithTyping({
-        ...prefixOptions,
+        ...replyPipeline,
         // Picker-triggered confirmations should stay immediate.
         deliver: async (payload: ReplyPayload) => {
           const trimmedPayload = {
@@ -1487,27 +1378,26 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
       accountId: account.accountId,
     });
 
-    const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
+    const { onModelSelected, typingCallbacks, ...replyPipeline } = createChannelReplyPipeline({
       cfg,
       agentId: route.agentId,
       channel: "mattermost",
       accountId: account.accountId,
-    });
-
-    const typingCallbacks = createTypingCallbacks({
-      start: () => sendTypingIndicator(channelId, effectiveReplyToId),
-      onStartError: (err) => {
-        logTypingFailure({
-          log: (message) => logger.debug?.(message),
-          channel: "mattermost",
-          target: channelId,
-          error: err,
-        });
+      typing: {
+        start: () => sendTypingIndicator(channelId, effectiveReplyToId),
+        onStartError: (err) => {
+          logTypingFailure({
+            log: (message) => logger.debug?.(message),
+            channel: "mattermost",
+            target: channelId,
+            error: err,
+          });
+        },
       },
     });
     const { dispatcher, replyOptions, markDispatchIdle } =
       core.channel.reply.createReplyDispatcherWithTyping({
-        ...prefixOptions,
+        ...replyPipeline,
         humanDelay: core.channel.reply.resolveHumanDelayConfig(cfg, route.agentId),
         typingCallbacks,
         deliver: async (payload: ReplyPayload) => {

@@ -23,8 +23,19 @@ function buildProps(result: SessionsListResult): SessionsProps {
     includeGlobal: false,
     includeUnknown: false,
     basePath: "",
+    searchQuery: "",
+    sortColumn: "updated",
+    sortDir: "desc",
+    page: 0,
+    pageSize: 25,
+    actionsOpenKey: null,
     modelSuggestions: [],
     onFiltersChange: () => undefined,
+    onSearchChange: () => undefined,
+    onSortChange: () => undefined,
+    onPageChange: () => undefined,
+    onPageSizeChange: () => undefined,
+    onActionsOpenChange: () => undefined,
     onRefresh: () => undefined,
     onPatch: () => undefined,
     onDelete: () => undefined,
@@ -50,7 +61,7 @@ describe("sessions view", () => {
     await Promise.resolve();
 
     const selects = container.querySelectorAll("select");
-    const verbose = selects[1] as HTMLSelectElement | undefined;
+    const verbose = selects[2] as HTMLSelectElement | undefined;
     expect(verbose?.value).toBe("full");
     expect(Array.from(verbose?.options ?? []).some((option) => option.value === "full")).toBe(true);
   });
@@ -73,7 +84,7 @@ describe("sessions view", () => {
     await Promise.resolve();
 
     const selects = container.querySelectorAll("select");
-    const reasoning = selects[2] as HTMLSelectElement | undefined;
+    const reasoning = selects[3] as HTMLSelectElement | undefined;
     expect(reasoning?.value).toBe("custom-mode");
     expect(
       Array.from(reasoning?.options ?? []).some((option) => option.value === "custom-mode"),

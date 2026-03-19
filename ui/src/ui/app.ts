@@ -557,7 +557,25 @@ export class OpenClawApp extends LitElement {
   }
 
   setThemeMode(next: ThemeMode, context?: Parameters<typeof setThemeModeInternal>[2]) {
-    setThemeModeInternal(this as unknown as Parameters<typeof setThemeModeInternal>[0], next, context);
+    setThemeModeInternal(
+      this as unknown as Parameters<typeof setThemeModeInternal>[0],
+      next,
+      context,
+    );
+  }
+
+  setBorderRadius(value: number) {
+    applySettingsInternal(this as unknown as Parameters<typeof applySettingsInternal>[0], {
+      ...this.settings,
+      borderRadius: value,
+    });
+    this.requestUpdate();
+  }
+
+  buildThemeOrder(active: ThemeName): ThemeName[] {
+    const all = [...VALID_THEME_NAMES];
+    const rest = all.filter((id) => id !== active);
+    return [active, ...rest];
   }
 
   async loadOverview() {

@@ -1,12 +1,10 @@
 export {
   buildComputedAccountStatusSnapshot,
   buildTokenChannelStatusSummary,
-  listDiscordDirectoryGroupsFromConfig,
-  listDiscordDirectoryPeersFromConfig,
   PAIRING_APPROVED_MESSAGE,
   projectCredentialSnapshotFields,
   resolveConfiguredFromCredentialStatuses,
-} from "openclaw/plugin-sdk/discord";
+} from "openclaw/plugin-sdk/channel-runtime";
 export {
   buildChannelConfigSchema,
   getChatChannelMeta,
@@ -14,6 +12,7 @@ export {
   readNumberParam,
   readStringArrayParam,
   readStringParam,
+  resolvePollMaxSelections,
   type ActionGate,
   type ChannelPlugin,
   type OpenClawConfig,
@@ -21,27 +20,32 @@ export {
 export { DiscordConfigSchema } from "openclaw/plugin-sdk/discord-core";
 export { readBooleanParam } from "openclaw/plugin-sdk/boolean-param";
 export {
+  assertMediaNotDataUrl,
+  parseAvailableTags,
+  readReactionParams,
+  withNormalizedTimestamp,
+} from "openclaw/plugin-sdk/discord-core";
+export {
+  createHybridChannelConfigAdapter,
+  createScopedChannelConfigAdapter,
   createScopedAccountConfigAccessors,
   createScopedChannelConfigBase,
+  createTopLevelChannelConfigAdapter,
 } from "openclaw/plugin-sdk/channel-config-helpers";
 export {
   createAccountActionGate,
   createAccountListHelpers,
-  DEFAULT_ACCOUNT_ID,
-  normalizeAccountId,
-  resolveAccountEntry,
-} from "openclaw/plugin-sdk/account-resolution";
+} from "openclaw/plugin-sdk/account-helpers";
+export { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "openclaw/plugin-sdk/account-id";
+export { resolveAccountEntry } from "openclaw/plugin-sdk/routing";
 export type {
   ChannelMessageActionAdapter,
   ChannelMessageActionName,
 } from "openclaw/plugin-sdk/channel-runtime";
-export { withNormalizedTimestamp } from "../../../src/agents/date-time.js";
-export { assertMediaNotDataUrl } from "../../../src/agents/sandbox-paths.js";
-export { parseAvailableTags, readReactionParams } from "openclaw/plugin-sdk/discord-core";
-export { resolvePollMaxSelections } from "../../../src/polls.js";
-export type { DiscordAccountConfig, DiscordActionConfig } from "../../../src/config/types.js";
+export type { DiscordConfig } from "openclaw/plugin-sdk/discord";
+export type { DiscordAccountConfig, DiscordActionConfig } from "openclaw/plugin-sdk/discord";
 export {
   hasConfiguredSecretInput,
   normalizeResolvedSecretInputString,
   normalizeSecretInputString,
-} from "../../../src/config/types.secrets.js";
+} from "openclaw/plugin-sdk/config-runtime";

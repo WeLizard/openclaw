@@ -3,12 +3,10 @@ import { resolveAgentDir, resolveDefaultAgentId } from "openclaw/plugin-sdk/agen
 import { resolveDefaultModelForAgent } from "openclaw/plugin-sdk/agent-runtime";
 import { shouldDebounceTextInbound } from "openclaw/plugin-sdk/channel-runtime";
 import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-runtime";
-import { loadConfig } from "openclaw/plugin-sdk/config-runtime";
 import { writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
 import {
   loadSessionStore,
   resolveSessionStoreEntry,
-  resolveStorePath,
   updateSessionStore,
 } from "openclaw/plugin-sdk/config-runtime";
 import type { DmPolicy } from "openclaw/plugin-sdk/config-runtime";
@@ -18,25 +16,19 @@ import type {
   TelegramTopicConfig,
 } from "openclaw/plugin-sdk/config-runtime";
 import { applyModelOverrideToSessionEntry } from "openclaw/plugin-sdk/config-runtime";
-import { readChannelAllowFromStore } from "openclaw/plugin-sdk/conversation-runtime";
 import {
   buildPluginBindingResolvedText,
   parsePluginBindingApprovalCustomId,
   resolvePluginConversationBindingApproval,
 } from "openclaw/plugin-sdk/conversation-runtime";
-import { enqueueSystemEvent } from "openclaw/plugin-sdk/infra-runtime";
 import { dispatchPluginInteractiveHandler } from "openclaw/plugin-sdk/plugin-runtime";
 import {
   createInboundDebouncer,
   resolveInboundDebounceMs,
 } from "openclaw/plugin-sdk/reply-runtime";
 import { buildCommandsPaginationKeyboard } from "openclaw/plugin-sdk/reply-runtime";
-import {
-  buildModelsProviderData,
-  formatModelsAvailableHeader,
-} from "openclaw/plugin-sdk/reply-runtime";
+import { formatModelsAvailableHeader } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveStoredModelOverride } from "openclaw/plugin-sdk/reply-runtime";
-import { listSkillCommandsForAgents } from "openclaw/plugin-sdk/reply-runtime";
 import { buildCommandsMessagePaginated } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
@@ -47,6 +39,7 @@ import {
   normalizeDmAllowFromWithStore,
   type NormalizedAllowFrom,
 } from "./bot-access.js";
+import { defaultTelegramBotDeps } from "./bot-deps.js";
 import {
   APPROVE_CALLBACK_DATA_RE,
   hasInboundMedia,
@@ -97,7 +90,6 @@ import {
   type ProviderInfo,
 } from "./model-buttons.js";
 import { buildInlineKeyboard } from "./send.js";
-import { wasSentByBot } from "./sent-message-cache.js";
 
 export const registerTelegramHandlers = ({
   cfg,
@@ -115,6 +107,7 @@ export const registerTelegramHandlers = ({
   shouldSkipUpdate,
   processMessage,
   logger,
+  telegramDeps = defaultTelegramBotDeps,
 }: RegisterTelegramHandlerParams) => {
   const DEFAULT_TEXT_FRAGMENT_MAX_GAP_MS = 1500;
   const TELEGRAM_TEXT_FRAGMENT_START_THRESHOLD_CHARS = 4000;
@@ -284,6 +277,7 @@ export const registerTelegramHandlers = ({
     sessionKey: string;
     model?: string;
   } => {
+    const runtimeCfg = telegramDeps.loadConfig();
     const resolvedThreadId =
       params.resolvedThreadId ??
       resolveTelegramForumThreadId({
@@ -294,7 +288,7 @@ export const registerTelegramHandlers = ({
     const topicThreadId = resolvedThreadId ?? dmThreadId;
     const { topicConfig } = resolveTelegramGroupConfig(params.chatId, topicThreadId);
     const { route } = resolveTelegramConversationRoute({
-      cfg,
+      cfg: runtimeCfg,
       accountId,
       chatId: params.chatId,
       isGroup: params.isGroup,
@@ -304,7 +298,7 @@ export const registerTelegramHandlers = ({
       topicAgentId: topicConfig?.agentId,
     });
     const baseSessionKey = resolveTelegramConversationBaseSessionKey({
-      cfg,
+      cfg: runtimeCfg,
       route,
       chatId: params.chatId,
       isGroup: params.isGroup,
@@ -315,7 +309,9 @@ export const registerTelegramHandlers = ({
         ? resolveThreadSessionKeys({ baseSessionKey, threadId: `${params.chatId}:${dmThreadId}` })
         : null;
     const sessionKey = threadKeys?.sessionKey ?? baseSessionKey;
-    const storePath = resolveStorePath(cfg.session?.store, { agentId: route.agentId });
+    const storePath = telegramDeps.resolveStorePath(runtimeCfg.session?.store, {
+      agentId: route.agentId,
+    });
     const store = loadSessionStore(storePath);
     const entry = resolveSessionStoreEntry({ store, sessionKey }).existing;
     const storedOverride = resolveStoredModelOverride({
@@ -343,7 +339,7 @@ export const registerTelegramHandlers = ({
         model: `${provider}/${model}`,
       };
     }
-    const modelCfg = cfg.agents?.defaults?.model;
+    const modelCfg = runtimeCfg.agents?.defaults?.model;
     return {
       agentId: route.agentId,
       sessionEntry: entry,
@@ -444,7 +440,7 @@ export const registerTelegramHandlers = ({
   };
 
   const loadStoreAllowFrom = async () =>
-    readChannelAllowFromStore("telegram", process.env, accountId).catch(() => []);
+    telegramDeps.readChannelAllowFromStore("telegram", process.env, accountId).catch(() => []);
 
   const resolveReplyMediaForMessage = async (
     ctx: TelegramContext,
@@ -647,6 +643,7 @@ export const registerTelegramHandlers = ({
         isForum: params.isForum,
         messageThreadId: params.messageThreadId,
         groupAllowFrom,
+        readChannelAllowFromStore: telegramDeps.readChannelAllowFromStore,
         resolveTelegramGroupConfig,
       }));
     // Use direct config dmPolicy override if available for DMs
@@ -760,7 +757,7 @@ export const registerTelegramHandlers = ({
       if (user?.is_bot) {
         return;
       }
-      if (reactionMode === "own" && !wasSentByBot(chatId, messageId)) {
+      if (reactionMode === "own" && !telegramDeps.wasSentByBot(chatId, messageId)) {
         return;
       }
       const eventAuthContext = await resolveTelegramEventAuthorizationContext({
@@ -835,7 +832,7 @@ export const registerTelegramHandlers = ({
       const parentPeer = buildTelegramParentPeer({ isGroup, resolvedThreadId, chatId });
       // Fresh config for bindings lookup; other routing inputs are payload-derived.
       const route = resolveAgentRoute({
-        cfg: loadConfig(),
+        cfg: telegramDeps.loadConfig(),
         channel: "telegram",
         accountId,
         peer: { kind: isGroup ? "group" : "direct", id: peerId },
@@ -847,7 +844,7 @@ export const registerTelegramHandlers = ({
       for (const r of addedReactions) {
         const emoji = r.emoji;
         const text = `Telegram reaction added: ${emoji} by ${senderLabel} on msg ${messageId}`;
-        enqueueSystemEvent(text, {
+        telegramDeps.enqueueSystemEvent(text, {
           sessionKey,
           contextKey: `telegram:reaction:add:${chatId}:${messageId}:${user?.id ?? "anon"}:${emoji}`,
         });
@@ -1267,10 +1264,11 @@ export const registerTelegramHandlers = ({
         return;
       }
 
+      const runtimeCfg = telegramDeps.loadConfig();
       if (isApprovalCallback) {
         if (
-          !isTelegramExecApprovalClientEnabled({ cfg, accountId }) ||
-          !isTelegramExecApprovalApprover({ cfg, accountId, senderId })
+          !isTelegramExecApprovalClientEnabled({ cfg: runtimeCfg, accountId }) ||
+          !isTelegramExecApprovalApprover({ cfg: runtimeCfg, accountId, senderId })
         ) {
           logVerbose(
             `Blocked telegram exec approval callback from ${senderId || "unknown"} (not an approver)`,
@@ -1302,12 +1300,12 @@ export const registerTelegramHandlers = ({
           return;
         }
 
-        const agentId = paginationMatch[2]?.trim() || resolveDefaultAgentId(cfg);
-        const skillCommands = listSkillCommandsForAgents({
-          cfg,
+        const agentId = paginationMatch[2]?.trim() || resolveDefaultAgentId(runtimeCfg);
+        const skillCommands = telegramDeps.listSkillCommandsForAgents({
+          cfg: runtimeCfg,
           agentIds: [agentId],
         });
-        const result = buildCommandsMessagePaginated(cfg, skillCommands, {
+        const result = buildCommandsMessagePaginated(runtimeCfg, skillCommands, {
           page,
           surface: "telegram",
         });
@@ -1341,7 +1339,10 @@ export const registerTelegramHandlers = ({
           resolvedThreadId,
           senderId,
         });
-        const modelData = await buildModelsProviderData(cfg, sessionState.agentId);
+        const modelData = await telegramDeps.buildModelsProviderData(
+          runtimeCfg,
+          sessionState.agentId,
+        );
         const { byProvider, providers } = modelData;
 
         const editMessageWithButtons = async (
@@ -1460,7 +1461,7 @@ export const registerTelegramHandlers = ({
           // Directly set model override in session
           try {
             // Get session store path
-            const storePath = resolveStorePath(cfg.session?.store, {
+            const storePath = telegramDeps.resolveStorePath(cfg.session?.store, {
               agentId: sessionState.agentId,
             });
 
@@ -1540,7 +1541,7 @@ export const registerTelegramHandlers = ({
       }
 
       // Check if old chat ID has config and migrate it
-      const currentConfig = loadConfig();
+      const currentConfig = telegramDeps.loadConfig();
       const migration = migrateTelegramGroupConfig({
         cfg: currentConfig,
         accountId,
@@ -1647,6 +1648,7 @@ export const registerTelegramHandlers = ({
           accountId,
           bot,
           logger,
+          upsertPairingRequest: telegramDeps.upsertChannelPairingRequest,
         });
         if (!dmAuthorized) {
           return;

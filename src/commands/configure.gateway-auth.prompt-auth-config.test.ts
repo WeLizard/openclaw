@@ -80,7 +80,7 @@ function createApplyAuthChoiceConfig(includeMinimaxProvider = false) {
                 minimax: {
                   baseUrl: "https://api.minimax.io/anthropic",
                   api: "anthropic-messages",
-                  models: [{ id: "MiniMax-M2.5", name: "MiniMax M2.5" }],
+                  models: [{ id: "MiniMax-M2.7", name: "MiniMax M2.7" }],
                 },
               }
             : {}),
@@ -119,7 +119,7 @@ describe("promptAuthConfig", () => {
       "minimax/minimax-m2.5:free",
     ]);
     expect(result.models?.providers?.minimax?.models?.map((model) => model.id)).toEqual([
-      "MiniMax-M2.5",
+      "MiniMax-M2.7",
     ]);
   });
 });
