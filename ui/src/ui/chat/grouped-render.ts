@@ -320,6 +320,7 @@ function renderGroupedMessage(
 ) {
   const m = message as Record<string, unknown>;
   const role = typeof m.role === "string" ? m.role : "unknown";
+  const normalizedRole = normalizeRoleForGrouping(role);
   const isToolResult =
     isToolResultMessage(message) ||
     role.toLowerCase() === "toolresult" ||
