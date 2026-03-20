@@ -4087,6 +4087,131 @@
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 
+.ov-expandable-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ov-expandable-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.ov-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--secondary);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ov-log-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  border-radius: var(--radius-full);
+  color: var(--muted);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.ov-log-refresh:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ov-log-refresh svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
+.ov-event-log,
+.ov-log-tail {
+  min-height: 0;
+}
+
+.ov-event-log[open],
+.ov-log-tail[open] {
+  padding-bottom: 14px;
+}
+
+.ov-event-log-list,
+.ov-log-tail-content {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.ov-event-log-list {
+  display: grid;
+  gap: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.ov-event-log-entry {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ov-event-log-entry:last-child {
+  border-bottom: none;
+}
+
+.ov-event-log-ts {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ov-event-log-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ov-event-log-payload {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ov-log-tail-content {
+  max-height: 360px;
+  overflow: auto;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+ }
+
 @media (max-width: 768px) {
   .ov-bottom-grid {
     grid-template-columns: 1fr;
