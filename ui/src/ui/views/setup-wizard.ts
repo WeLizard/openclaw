@@ -196,7 +196,7 @@ export function renderSetupWizard(state: AppViewState) {
           ? html`<div class="callout danger" style="margin-top: 14px;">${state.wizardError}</div>`
           : nothing}
 
-        ${renderWizardBody(state)}
+        <div class="wizard-body">${renderWizardBody(state)}</div>
 
         <div class="exec-approval-actions wizard-actions">
           ${isTerminalState

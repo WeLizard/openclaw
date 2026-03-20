@@ -227,6 +227,16 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     cronEnabled: null,
     cronNext: null,
     lastChannelsRefresh: null,
+    usageResult: null,
+    sessionsResult: null,
+    skillsReport: null,
+    cronJobs: [],
+    cronStatus: null,
+    attentionItems: [],
+    eventLog: [],
+    overviewLogLines: [],
+    showGatewayToken: false,
+    showGatewayPassword: false,
     modelAuthLoading: false,
     modelAuthBusyKey: null,
     modelAuthError: null,
@@ -238,8 +248,12 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     onSettingsChange: () => undefined,
     onPasswordChange: () => undefined,
     onSessionKeyChange: () => undefined,
+    onToggleGatewayTokenVisibility: () => undefined,
+    onToggleGatewayPasswordVisibility: () => undefined,
     onConnect: () => undefined,
     onRefresh: () => undefined,
+    onNavigate: () => undefined,
+    onRefreshLogs: () => undefined,
     onModelAuthRefresh: () => undefined,
     onPromoteProfile: () => undefined,
     onClearProviderOrder: () => undefined,
@@ -484,6 +498,50 @@ describe("chat view", () => {
     expect(resetOrderButton).toBeDefined();
     expect(resetOrderButton?.disabled).toBe(true);
     expect(resetOrderButton?.title).toBe("There is no stored custom order to reset.");
+  });
+
+  it("renders provider rotation order and add-account action for stored profiles", async () => {
+    const container = document.createElement("div");
+    await i18n.setLocale("en");
+    const status = createModelAuthStatus();
+    status.providers[0].counts.total = 2;
+    status.providers[0].counts.available = 2;
+    status.providers[0].currentOrder = ["cliproxy:default", "cliproxy:backup"];
+    status.providers[0].profiles.push({
+      profileId: "cliproxy:backup",
+      label: "cliproxy:backup",
+      provider: "cliproxy",
+      type: "api_key",
+      healthStatus: "ok",
+      unusableKind: "available",
+      unusableRemainingMs: null,
+      disabledReason: null,
+      remainingMs: null,
+      inStoredOrder: false,
+      isCurrent: false,
+      isLastGood: false,
+      lastUsed: null,
+      errorCount: 0,
+    });
+
+    render(
+      renderOverview(
+        createOverviewProps({
+          connected: true,
+          modelAuthStatus: status,
+        }),
+      ),
+      container,
+    );
+
+    expect(container.textContent).toContain("Rotation order");
+    expect(container.textContent).toContain("#1 cliproxy:default");
+    expect(container.textContent).toContain("#2 cliproxy:backup");
+    expect(
+      [...container.querySelectorAll<HTMLButtonElement>("button")].some(
+        (button) => button.textContent?.trim() === "Add account",
+      ),
+    ).toBe(true);
   });
 
   it("renders compacting indicator as a badge", () => {
