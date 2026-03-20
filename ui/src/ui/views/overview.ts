@@ -362,7 +362,7 @@ function renderProviderRotation(entry: ModelsAuthProviderStatus, props: Overview
                   aria-label=${t("overview.accounts.moveUp")}
                   @click=${() => props.onMoveProfileOrder(entry.provider, profileId, "up")}
                 >
-                  ↑
+                  ←
                 </button>
                 <button
                   class="overview-auth-rotation-btn"
@@ -373,7 +373,7 @@ function renderProviderRotation(entry: ModelsAuthProviderStatus, props: Overview
                   aria-label=${t("overview.accounts.moveDown")}
                   @click=${() => props.onMoveProfileOrder(entry.provider, profileId, "down")}
                 >
-                  ↓
+                  →
                 </button>
               </span>
             </span>

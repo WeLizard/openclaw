@@ -591,9 +591,13 @@ describe("chat view", () => {
     expect(upButtons).toHaveLength(2);
     expect(downButtons).toHaveLength(2);
     expect(upButtons[0]?.disabled).toBe(true);
-    expect(upButtons[0]?.title).toBe("This profile is already first in the current rotation order.");
+    expect(upButtons[0]?.title).toBe(
+      "This profile is already at the left edge of the current rotation order.",
+    );
     expect(downButtons[1]?.disabled).toBe(true);
-    expect(downButtons[1]?.title).toBe("This profile is already last in the current rotation order.");
+    expect(downButtons[1]?.title).toBe(
+      "This profile is already at the right edge of the current rotation order.",
+    );
 
     upButtons[1]?.click();
     expect(onMoveProfileOrder).toHaveBeenCalledWith("cliproxy", "cliproxy:backup", "up");
