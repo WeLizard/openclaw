@@ -84,6 +84,26 @@ describe("models cli", () => {
     );
   });
 
+  it("passes --profile-id through models auth login", async () => {
+    await runModelsCommand([
+      "models",
+      "auth",
+      "login",
+      "--provider",
+      "qwen-portal",
+      "--profile-id",
+      "qwen-portal:work",
+    ]);
+
+    expect(modelsAuthLoginCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "qwen-portal",
+        profileId: "qwen-portal:work",
+      }),
+      expect.any(Object),
+    );
+  });
+
   it.each([
     { label: "status flag", args: ["models", "status", "--agent", "poe"] },
     { label: "parent flag", args: ["models", "--agent", "poe", "status"] },

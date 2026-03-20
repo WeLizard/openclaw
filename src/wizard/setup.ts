@@ -74,6 +74,69 @@ async function requireRiskAcknowledgement(params: {
   }
 }
 
+async function runModelsAuthLoginWizard(params: {
+  opts: OnboardOptions;
+  baseConfig: OpenClawConfig;
+  prompter: WizardPrompter;
+  runtime: RuntimeEnv;
+}) {
+  const { opts, baseConfig, prompter, runtime } = params;
+  const onboardHelpers = await import("../commands/onboard-helpers.js");
+  const { writeConfigFile } = await import("../config/config.js");
+  const { logConfigUpdated } = await import("../config/logging.js");
+  const { applyLocalSetupWorkspaceConfig } = await import("../commands/onboard-config.js");
+  const { ensureAuthProfileStore } = await import("../agents/auth-profiles.runtime.js");
+  const { promptAuthChoiceGrouped } = await import("../commands/auth-choice-prompt.js");
+  const { promptCustomApiConfig } = await import("../commands/onboard-custom.js");
+  const { applyAuthChoice } = await import("../commands/auth-choice.js");
+
+  const workspaceInput =
+    opts.workspace ?? baseConfig.agents?.defaults?.workspace ?? onboardHelpers.DEFAULT_WORKSPACE;
+  const workspaceDir = resolveUserPath(workspaceInput.trim() || onboardHelpers.DEFAULT_WORKSPACE);
+  let nextConfig: OpenClawConfig = applyLocalSetupWorkspaceConfig(baseConfig, workspaceDir);
+
+  const authStore = ensureAuthProfileStore(undefined, {
+    allowKeychainPrompt: false,
+  });
+
+  const authChoice =
+    opts.authChoice ??
+    (await promptAuthChoiceGrouped({
+      prompter,
+      store: authStore,
+      includeSkip: false,
+      provider: opts.provider,
+      oauthOnly: opts.oauthOnly === true,
+    }));
+
+  if (authChoice === "custom-api-key") {
+    const customResult = await promptCustomApiConfig({
+      prompter,
+      runtime,
+      config: nextConfig,
+      secretInputMode: opts.secretInputMode,
+    });
+    nextConfig = customResult.config;
+  } else if (authChoice !== "skip") {
+    const authResult = await applyAuthChoice({
+      authChoice,
+      config: nextConfig,
+      prompter,
+      runtime,
+      setDefaultModel: false,
+      opts: {
+        tokenProvider: opts.tokenProvider,
+        token: opts.authChoice === "apiKey" && opts.token ? opts.token : undefined,
+      },
+    });
+    nextConfig = authResult.config;
+  }
+
+  await writeConfigFile(nextConfig);
+  logConfigUpdated(runtime);
+  await prompter.outro("Auth setup complete.");
+}
+
 export async function runSetupWizard(
   opts: OnboardOptions,
   runtime: RuntimeEnv = defaultRuntime,
@@ -81,13 +144,18 @@ export async function runSetupWizard(
 ) {
   const onboardHelpers = await import("../commands/onboard-helpers.js");
   onboardHelpers.printWizardHeader(runtime);
-  await prompter.intro("OpenClaw setup");
-  await requireRiskAcknowledgement({ opts, prompter });
+  if (opts.intent !== "models-auth-login") {
+    await prompter.intro("OpenClaw setup");
+    await requireRiskAcknowledgement({ opts, prompter });
+  }
 
   const snapshot = await readConfigFileSnapshot();
   let baseConfig: OpenClawConfig = snapshot.valid ? (snapshot.exists ? snapshot.config : {}) : {};
 
   if (snapshot.exists && !snapshot.valid) {
+    if (opts.intent === "models-auth-login") {
+      throw new Error("Config is invalid. Fix it first, then re-run auth setup.");
+    }
     await prompter.note(onboardHelpers.summarizeExistingConfig(baseConfig), "Invalid config");
     if (snapshot.issues.length > 0) {
       await prompter.note(
@@ -103,6 +171,11 @@ export async function runSetupWizard(
       `Config invalid. Run \`${formatCliCommand("openclaw doctor")}\` to repair it, then re-run setup.`,
     );
     runtime.exit(1);
+    return;
+  }
+
+  if (opts.intent === "models-auth-login") {
+    await runModelsAuthLoginWizard({ opts, baseConfig, prompter, runtime });
     return;
   }
 

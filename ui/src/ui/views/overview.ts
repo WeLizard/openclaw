@@ -317,6 +317,31 @@ function renderProfileRow(
   `;
 }
 
+function renderProviderRotation(entry: ModelsAuthProviderStatus) {
+  if (entry.profiles.length === 0 || entry.currentOrder.length === 0) {
+    return nothing;
+  }
+  const profilesById = new Map(entry.profiles.map((profile) => [profile.profileId, profile]));
+  return html`
+    <div style="margin-top: 12px;">
+      <div class="muted">${t("overview.accounts.rotationOrder")}</div>
+      <div class="chip-row" style="margin-top: 8px;">
+        ${entry.currentOrder.map((profileId, index) => {
+          const profile = profilesById.get(profileId);
+          const label = profile?.label || profileId;
+          const isActive = entry.activeProfileId === profileId;
+          return html`
+            <span class=${isActive ? "chip chip-ok" : "chip"}>
+              #${index + 1} ${label}
+            </span>
+          `;
+        })}
+      </div>
+      <div class="muted" style="margin-top: 8px;">${t("overview.accounts.rotationHint")}</div>
+    </div>
+  `;
+}
+
 export function resolveDisplayedProviderStatus(
   entry: ModelsAuthProviderStatus,
 ): ModelsAuthProviderStatus["status"] {
@@ -334,6 +359,10 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
   const activeProfile =
     entry.profiles.find((profile) => profile.profileId === entry.activeProfileId) ?? null;
   const displayStatus = resolveDisplayedProviderStatus(entry);
+  const authActionLabel =
+    entry.effective.kind === "profiles" && entry.profiles.length > 0
+      ? t("overview.accounts.addAccount")
+      : t("overview.accounts.oauthReauth");
   return html`
     <section class="overview-auth-provider ${entry.inUse ? "overview-auth-provider--in-use" : ""}">
       <div class="overview-auth-provider__header">
@@ -355,7 +384,7 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
             ?disabled=${Boolean(props.modelAuthBusyKey) || props.wizardLoading || props.wizardBusy || props.wizardOpen}
             @click=${() => props.onStartProviderAuth(entry.provider)}
           >
-            ${t("overview.accounts.oauthReauth")}
+            ${authActionLabel}
           </button>
           <button
             class="btn btn--sm"
@@ -378,6 +407,8 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
             : nothing
         }
       </div>
+
+      ${renderProviderRotation(entry)}
 
       ${
         entry.profiles.length === 0
@@ -435,6 +466,8 @@ function renderAccountsSection(props: OverviewProps) {
 
       <div class="muted" style="margin-top: 12px;">
         ${t("overview.accounts.addProviderHint")}
+        <br />
+        ${t("overview.accounts.multiAccountHint")}
       </div>
 
       ${

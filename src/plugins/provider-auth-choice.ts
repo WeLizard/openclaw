@@ -10,6 +10,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { enablePluginInConfig } from "./enable.js";
+import { confirmAuthProfileOverwrites } from "./provider-auth-conflicts.js";
 import {
   applyDefaultModel,
   mergeConfigPatch,
@@ -123,6 +124,15 @@ export async function runProviderPluginAuthMethod(params: {
       createVpsAwareHandlers: (opts) => createVpsAwareOAuthHandlers(opts),
     },
   });
+
+  const confirmed = await confirmAuthProfileOverwrites({
+    profiles: result.profiles,
+    agentDir,
+    prompter: params.prompter,
+  });
+  if (!confirmed) {
+    return { config: params.config };
+  }
 
   let nextConfig = params.config;
   if (result.configPatch) {

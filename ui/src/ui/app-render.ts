@@ -88,6 +88,7 @@ import {
   resolveAgentConfig,
   resolveConfiguredCronModelSuggestions,
   resolveEffectiveModelFallbacks,
+  resolveModelFallbacks,
   resolveModelPrimary,
   sortLocaleStrings,
 } from "./views/agents-utils.ts";
@@ -1239,6 +1240,49 @@ export function renderApp(state: AppViewState) {
                       if (primary) {
                         updateConfigFormValue(state, basePath, primary);
                       } else {
+                        removeConfigFormValue(state, basePath);
+                      }
+                      return;
+                    }
+                    if (!primary) {
+                      return;
+                    }
+                    updateConfigFormValue(state, basePath, { primary, fallbacks: normalized });
+                  },
+                  onImageModelChange: (modelId) => {
+                    const basePath = ["agents", "defaults", "imageModel"];
+                    const defaults = (
+                      getCurrentConfigValue() as { agents?: { defaults?: { imageModel?: unknown } } } | null
+                    )?.agents?.defaults;
+                    const existing = defaults?.imageModel;
+                    if (!modelId) {
+                      removeConfigFormValue(state, basePath);
+                      return;
+                    }
+                    if (existing && typeof existing === "object" && !Array.isArray(existing)) {
+                      const fallbacks = (existing as { fallbacks?: unknown }).fallbacks;
+                      const next = {
+                        primary: modelId,
+                        ...(Array.isArray(fallbacks) ? { fallbacks } : {}),
+                      };
+                      updateConfigFormValue(state, basePath, next);
+                    } else {
+                      updateConfigFormValue(state, basePath, modelId);
+                    }
+                  },
+                  onImageFallbacksChange: (fallbacks) => {
+                    const normalized = fallbacks.map((name) => name.trim()).filter(Boolean);
+                    const currentConfig = getCurrentConfigValue() as {
+                      agents?: { defaults?: { imageModel?: unknown } };
+                    } | null;
+                    const defaultsImageModel = currentConfig?.agents?.defaults?.imageModel;
+                    const primary = resolveModelPrimary(defaultsImageModel);
+                    const effectiveFallbacks = resolveModelFallbacks(defaultsImageModel);
+                    const basePath = ["agents", "defaults", "imageModel"];
+                    if (normalized.length === 0) {
+                      if (primary) {
+                        updateConfigFormValue(state, basePath, primary);
+                      } else if ((effectiveFallbacks?.length ?? 0) > 0) {
                         removeConfigFormValue(state, basePath);
                       }
                       return;

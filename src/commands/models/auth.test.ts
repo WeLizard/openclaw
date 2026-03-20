@@ -158,6 +158,7 @@ describe("modelsAuthLoginCommand", () => {
     mocks.createClackPrompter.mockReturnValue({
       note: vi.fn(async () => {}),
       select: vi.fn(),
+      confirm: vi.fn(async () => true),
     });
     runProviderAuth = vi.fn().mockResolvedValue({
       profiles: [
@@ -216,6 +217,42 @@ describe("modelsAuthLoginCommand", () => {
     expect(runtime.log).toHaveBeenCalledWith(
       "Default model available: openai-codex/gpt-5.4 (use --set-default to apply)",
     );
+  });
+
+  it("passes --profile-id through to provider auth methods", async () => {
+    const runtime = createRuntime();
+
+    await modelsAuthLoginCommand(
+      { provider: "openai-codex", profileId: "openai-codex:work" },
+      runtime,
+    );
+
+    expect(runProviderAuth).toHaveBeenCalledOnce();
+    expect(runProviderAuth.mock.calls[0]?.[0]).toMatchObject({
+      opts: {
+        profileId: "openai-codex:work",
+      },
+    });
+    expect(mocks.upsertAuthProfile).toHaveBeenCalledWith({
+      profileId: "openai-codex:user@example.com",
+      credential: expect.objectContaining({
+        type: "oauth",
+        provider: "openai-codex",
+      }),
+      agentDir: "/tmp/openclaw/agents/main",
+    });
+  });
+
+  it("rejects mismatched provider profile ids before running auth", async () => {
+    const runtime = createRuntime();
+
+    await expect(
+      modelsAuthLoginCommand({ provider: "openai-codex", profileId: "qwen-portal:work" }, runtime),
+    ).rejects.toThrow(
+      'Profile id "qwen-portal:work" does not belong to provider "openai-codex". Use the format "openai-codex:<suffix>".',
+    );
+
+    expect(runProviderAuth).not.toHaveBeenCalled();
   });
 
   it("applies openai-codex default model when --set-default is used", async () => {
@@ -288,6 +325,60 @@ describe("modelsAuthLoginCommand", () => {
 
     await expect(modelsAuthLoginCommand({ provider: "anthropic" }, runtime)).rejects.toThrow(
       'Unknown provider "anthropic". Loaded providers: openai-codex. Verify plugins via `openclaw plugins list --json`.',
+    );
+  });
+
+  it("does not silently overwrite an existing auth profile when replacement is declined", async () => {
+    const runtime = createRuntime();
+    const confirm = vi.fn(async () => false);
+    const note = vi.fn(async () => {});
+    runProviderAuth.mockResolvedValueOnce({
+      profiles: [
+        {
+          profileId: "openai-codex:user@example.com",
+          credential: {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "next-access-token",
+            refresh: "next-refresh-token",
+            expires: Date.now() + 60_000,
+            email: "user@example.com",
+          },
+        },
+      ],
+      defaultModel: "openai-codex/gpt-5.4",
+    });
+    mocks.createClackPrompter.mockReturnValue({
+      note,
+      select: vi.fn(),
+      confirm,
+    });
+    mocks.loadAuthProfileStoreForRuntime.mockReturnValue({
+      profiles: {
+        "openai-codex:user@example.com": {
+          type: "oauth",
+          provider: "openai-codex",
+          access: "old-access-token",
+          refresh: "old-refresh-token",
+          expires: Date.now() + 30_000,
+          email: "user@example.com",
+        },
+      },
+      usageStats: {},
+    });
+
+    await modelsAuthLoginCommand({ provider: "openai-codex" }, runtime);
+
+    expect(confirm).toHaveBeenCalledWith({
+      message: "Replace existing profile openai-codex:user@example.com?",
+      initialValue: false,
+    });
+    expect(mocks.upsertAuthProfile).not.toHaveBeenCalled();
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
+    expect(mocks.logConfigUpdated).not.toHaveBeenCalled();
+    expect(note).toHaveBeenCalledWith(
+      expect.stringContaining("Auth profile already exists: openai-codex:user@example.com."),
+      "Existing profile",
     );
   });
 
