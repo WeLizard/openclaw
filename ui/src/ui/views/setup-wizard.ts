@@ -3,6 +3,20 @@ import { t } from "../../i18n/index.ts";
 import type { AppViewState } from "../app-view-state.ts";
 import type { WizardStep } from "../types.ts";
 
+const URL_PATTERN = /(https?:\/\/[^\s]+)/g;
+
+function renderLinkedText(value: string) {
+  return value.split(URL_PATTERN).map((part) => {
+    if (!part) {
+      return nothing;
+    }
+    if (/^https?:\/\/[^\s]+$/.test(part)) {
+      return html`<a href=${part} target="_blank" rel="noreferrer noopener">${part}</a>`;
+    }
+    return html`<span>${part}</span>`;
+  });
+}
+
 function wizardValueEquals(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) {
     return true;
@@ -53,7 +67,7 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
   if (step.type === "confirm") {
     const current = Boolean(state.wizardDraftValue);
     return html`
-      <div class="wizard-step-message">${step.message ?? ""}</div>
+      <div class="wizard-step-message">${renderLinkedText(step.message ?? "")}</div>
       <div class="wizard-option-list" style="margin-top: 14px;">
         <button
           class="wizard-option ${current ? "active" : ""}"
@@ -72,7 +86,9 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
   }
   if (step.type === "select") {
     return html`
-      ${step.message ? html`<div class="wizard-step-message">${step.message}</div>` : nothing}
+      ${step.message
+        ? html`<div class="wizard-step-message">${renderLinkedText(step.message)}</div>`
+        : nothing}
       <div class="wizard-option-list" style="margin-top: 14px;">
         ${options.map(
           (option) => html`
@@ -84,7 +100,7 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
             >
               <div class="wizard-option__label">${option.label}</div>
               ${option.hint
-                ? html`<div class="wizard-option__hint">${option.hint}</div>`
+                ? html`<div class="wizard-option__hint">${renderLinkedText(option.hint)}</div>`
                 : nothing}
             </button>
           `,
@@ -95,7 +111,9 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
   if (step.type === "multiselect") {
     const current = Array.isArray(state.wizardDraftValue) ? state.wizardDraftValue : [];
     return html`
-      ${step.message ? html`<div class="wizard-step-message">${step.message}</div>` : nothing}
+      ${step.message
+        ? html`<div class="wizard-step-message">${renderLinkedText(step.message)}</div>`
+        : nothing}
       <div class="wizard-option-list" style="margin-top: 14px;">
         ${options.map(
           (option) => html`
@@ -106,7 +124,7 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
             >
               <div class="wizard-option__label">${option.label}</div>
               ${option.hint
-                ? html`<div class="wizard-option__hint">${option.hint}</div>`
+                ? html`<div class="wizard-option__hint">${renderLinkedText(option.hint)}</div>`
                 : nothing}
             </button>
           `,
@@ -114,7 +132,9 @@ function renderWizardStep(step: WizardStep, state: AppViewState) {
       </div>
     `;
   }
-  return html`${step.message ? html`<div class="wizard-step-message">${step.message}</div>` : nothing}`;
+  return html`${step.message
+    ? html`<div class="wizard-step-message">${renderLinkedText(step.message)}</div>`
+    : nothing}`;
 }
 
 function resolveWizardActionLabel(state: AppViewState): string {
