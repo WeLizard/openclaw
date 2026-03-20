@@ -2861,6 +2861,44 @@
   color: var(--muted);
 }
 
+.overview-auth-rotation-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overview-auth-rotation-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overview-auth-rotation-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 0;
+}
+
+.overview-auth-rotation-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.overview-auth-rotation-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .overview-auth-profile__actions {
   display: flex;
   flex-direction: column;

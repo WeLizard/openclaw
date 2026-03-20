@@ -198,24 +198,6 @@ function renderProfileRow(
     profile.unusableKind === "disabled" && profile.disabledReason === "manual";
   const canDisable = profile.unusableKind === "available" || profile.unusableKind === "cooldown";
   const isDeleteConfirming = props.modelAuthDeleteConfirmProfileId === profile.profileId;
-  const profileIndex = provider.profiles.findIndex((entry) => entry.profileId === profile.profileId);
-  const canReorder = provider.profiles.length > 1 && profileIndex >= 0;
-  const moveUpDisabled = Boolean(props.modelAuthBusyKey) || isBusy || !canReorder || profileIndex === 0;
-  const moveDownDisabled =
-    Boolean(props.modelAuthBusyKey) ||
-    isBusy ||
-    !canReorder ||
-    profileIndex === provider.profiles.length - 1;
-  const moveUpTitle = !canReorder
-    ? t("overview.accounts.moveDisabledSingle")
-    : profileIndex === 0
-      ? t("overview.accounts.moveUpDisabledTop")
-      : "";
-  const moveDownTitle = !canReorder
-    ? t("overview.accounts.moveDisabledSingle")
-    : profileIndex === provider.profiles.length - 1
-      ? t("overview.accounts.moveDownDisabledBottom")
-      : "";
   const makePrimaryDisabled = Boolean(props.modelAuthBusyKey) || profile.isCurrent;
   const makePrimaryTitle = profile.isCurrent
     ? t("overview.accounts.makePrimaryDisabledCurrent")
@@ -266,28 +248,6 @@ function renderProfileRow(
         </div>
       </div>
       <div class="overview-auth-profile__actions">
-        <button
-          class="btn btn--sm"
-          data-auth-order-move="up"
-          data-profile-id=${profile.profileId}
-          ?disabled=${moveUpDisabled}
-          title=${moveUpTitle}
-          aria-label=${t("overview.accounts.moveUp")}
-          @click=${() => props.onMoveProfileOrder(provider.provider, profile.profileId, "up")}
-        >
-          ↑
-        </button>
-        <button
-          class="btn btn--sm"
-          data-auth-order-move="down"
-          data-profile-id=${profile.profileId}
-          ?disabled=${moveDownDisabled}
-          title=${moveDownTitle}
-          aria-label=${t("overview.accounts.moveDown")}
-          @click=${() => props.onMoveProfileOrder(provider.provider, profile.profileId, "down")}
-        >
-          ↓
-        </button>
         <button
           class="btn btn--sm"
           ?disabled=${makePrimaryDisabled}
@@ -360,7 +320,7 @@ function renderProfileRow(
   `;
 }
 
-function renderProviderRotation(entry: ModelsAuthProviderStatus) {
+function renderProviderRotation(entry: ModelsAuthProviderStatus, props: OverviewProps) {
   if (entry.profiles.length === 0 || entry.currentOrder.length === 0) {
     return nothing;
   }
@@ -373,9 +333,49 @@ function renderProviderRotation(entry: ModelsAuthProviderStatus) {
           const profile = profilesById.get(profileId);
           const label = profile?.label || profileId;
           const isActive = entry.activeProfileId === profileId;
+          const isMoveBusy =
+            props.modelAuthBusyKey === `move-order:${entry.provider}:${profileId}:up` ||
+            props.modelAuthBusyKey === `move-order:${entry.provider}:${profileId}:down`;
+          const moveUpDisabled = Boolean(props.modelAuthBusyKey) || isMoveBusy || index === 0;
+          const moveDownDisabled =
+            Boolean(props.modelAuthBusyKey) || isMoveBusy || index === entry.currentOrder.length - 1;
+          const moveUpTitle = moveUpDisabled
+            ? index === 0
+              ? t("overview.accounts.moveUpDisabledTop")
+              : ""
+            : "";
+          const moveDownTitle = moveDownDisabled
+            ? index === entry.currentOrder.length - 1
+              ? t("overview.accounts.moveDownDisabledBottom")
+              : ""
+            : "";
           return html`
-            <span class=${isActive ? "chip chip-ok" : "chip"}>
-              #${index + 1} ${label}
+            <span class="overview-auth-rotation-item ${isActive ? "overview-auth-rotation-item--active" : ""}">
+              <span class=${isActive ? "chip chip-ok" : "chip"}>#${index + 1} ${label}</span>
+              <span class="overview-auth-rotation-actions" role="group" aria-label=${t("overview.accounts.rotationOrder")}>
+                <button
+                  class="overview-auth-rotation-btn"
+                  data-auth-order-move="up"
+                  data-profile-id=${profileId}
+                  ?disabled=${moveUpDisabled}
+                  title=${moveUpTitle}
+                  aria-label=${t("overview.accounts.moveUp")}
+                  @click=${() => props.onMoveProfileOrder(entry.provider, profileId, "up")}
+                >
+                  ↑
+                </button>
+                <button
+                  class="overview-auth-rotation-btn"
+                  data-auth-order-move="down"
+                  data-profile-id=${profileId}
+                  ?disabled=${moveDownDisabled}
+                  title=${moveDownTitle}
+                  aria-label=${t("overview.accounts.moveDown")}
+                  @click=${() => props.onMoveProfileOrder(entry.provider, profileId, "down")}
+                >
+                  ↓
+                </button>
+              </span>
             </span>
           `;
         })}
@@ -451,7 +451,7 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
         }
       </div>
 
-      ${renderProviderRotation(entry)}
+      ${renderProviderRotation(entry, props)}
 
       ${
         entry.profiles.length === 0
