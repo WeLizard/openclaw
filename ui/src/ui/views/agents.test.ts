@@ -100,6 +100,8 @@ function createProps(overrides: Partial<AgentsProps> = {}): AgentsProps {
     onConfigSave: () => undefined,
     onModelChange: () => undefined,
     onModelFallbacksChange: () => undefined,
+    onImageModelChange: () => undefined,
+    onImageFallbacksChange: () => undefined,
     onChannelsRefresh: () => undefined,
     onCronRefresh: () => undefined,
     onCronRunNow: () => undefined,
@@ -170,5 +172,43 @@ describe("renderAgents", () => {
     );
 
     expect(skillsTab?.textContent?.trim()).toContain("1");
+  });
+
+  it("renders global image routing controls in the overview panel", async () => {
+    const container = document.createElement("div");
+    render(
+      renderAgents(
+        createProps({
+          config: {
+            form: {
+              agents: {
+                defaults: {
+                  models: {
+                    "qwen-portal/coder-model": {},
+                    "qwen-portal/vision-model": {},
+                    "cliproxy/gpt-5.4": {},
+                  },
+                  imageModel: {
+                    primary: "qwen-portal/vision-model",
+                    fallbacks: ["cliproxy/gpt-5.4"],
+                  },
+                },
+                list: [{ id: "alpha" }, { id: "beta", model: "qwen-portal/coder-model" }],
+              },
+            },
+            loading: false,
+            saving: false,
+            dirty: false,
+          },
+        }),
+      ),
+      container,
+    );
+    await Promise.resolve();
+
+    expect(container.textContent).toContain("Image routing (global)");
+    expect(container.textContent).toContain("Image model");
+    expect(container.textContent).toContain("Used when the current text model cannot accept images.");
+    expect(container.querySelectorAll("select").length).toBe(2);
   });
 });
