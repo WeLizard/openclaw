@@ -65,6 +65,7 @@ import {
   disableModelAuthProfile as disableModelAuthProfileInternal,
   enableModelAuthProfile as enableModelAuthProfileInternal,
   loadModelAuthStatus as loadModelAuthStatusInternal,
+  moveModelAuthOrderProfile as moveModelAuthOrderProfileInternal,
   promoteModelAuthProfile as promoteModelAuthProfileInternal,
 } from "./controllers/model-auth.ts";
 import { loadAvailableModels as loadAvailableModelsInternal } from "./controllers/model-catalog.ts";
@@ -596,6 +597,14 @@ export class OpenClawApp extends LitElement {
 
   async handleClearModelAuthOrder(provider: string) {
     await clearModelAuthOrderInternal(this, provider);
+  }
+
+  async handleMoveModelAuthOrderProfile(
+    provider: string,
+    profileId: string,
+    direction: "up" | "down",
+  ) {
+    await moveModelAuthOrderProfileInternal(this, provider, profileId, direction);
   }
 
   async handleClearModelAuthCooldown(profileId: string) {

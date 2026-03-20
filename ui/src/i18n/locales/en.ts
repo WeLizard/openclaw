@@ -162,6 +162,11 @@ export const en: TranslationMap = {
         "This provider uses a static API key from openclaw.json; auth profiles are not required.",
       envConfig:
         "This provider uses an API key from environment variables; auth profiles are not required.",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      moveDisabledSingle: "You need at least two profiles to reorder rotation.",
+      moveUpDisabledTop: "This profile is already first in the current rotation order.",
+      moveDownDisabledBottom: "This profile is already last in the current rotation order.",
       makePrimary: "Make primary",
       addAccount: "Add account",
       oauthReauth: "Auth setup",

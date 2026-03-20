@@ -675,6 +675,8 @@ export function renderApp(state: AppViewState) {
                 onModelAuthRefresh: () => void state.handleLoadModelAuthStatus(),
                 onPromoteProfile: (provider, profileId) =>
                   void state.handlePromoteModelAuthProfile(provider, profileId),
+                onMoveProfileOrder: (provider, profileId, direction) =>
+                  void state.handleMoveModelAuthOrderProfile(provider, profileId, direction),
                 onClearProviderOrder: (provider) => void state.handleClearModelAuthOrder(provider),
                 onClearProfileCooldown: (profileId) =>
                   void state.handleClearModelAuthCooldown(profileId),

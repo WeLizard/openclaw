@@ -77,6 +77,20 @@ export async function clearModelAuthOrder(state: ModelAuthState, provider: strin
   );
 }
 
+export async function moveModelAuthOrderProfile(
+  state: ModelAuthState,
+  provider: string,
+  profileId: string,
+  direction: "up" | "down",
+) {
+  await runModelAuthAction(
+    state,
+    `move-order:${provider}:${profileId}:${direction}`,
+    "models.auth.order.move",
+    { provider, profileId, direction },
+  );
+}
+
 export async function clearModelAuthCooldown(state: ModelAuthState, profileId: string) {
   await runModelAuthAction(
     state,

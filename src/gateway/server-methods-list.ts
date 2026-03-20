@@ -39,6 +39,7 @@ const BASE_METHODS = [
   "models.auth.status",
   "models.auth.promote",
   "models.auth.order.clear",
+  "models.auth.order.move",
   "models.auth.cooldown.clear",
   "models.auth.profile.disable",
   "models.auth.profile.enable",

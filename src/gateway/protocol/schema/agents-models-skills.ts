@@ -197,6 +197,16 @@ export const ModelsAuthOrderClearParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const ModelsAuthOrderMoveParamsSchema = Type.Object(
+  {
+    provider: NonEmptyString,
+    profileId: NonEmptyString,
+    direction: Type.Union([Type.Literal("up"), Type.Literal("down")]),
+    agentId: Type.Optional(NonEmptyString),
+  },
+  { additionalProperties: false },
+);
+
 export const ModelsAuthCooldownClearParamsSchema = Type.Object(
   {
     profileId: NonEmptyString,

@@ -70,6 +70,7 @@ export type OverviewProps = {
   wizardBusy: boolean;
   onModelAuthRefresh: () => void;
   onPromoteProfile: (provider: string, profileId: string) => void;
+  onMoveProfileOrder: (provider: string, profileId: string, direction: "up" | "down") => void;
   onClearProviderOrder: (provider: string) => void;
   onClearProfileCooldown: (profileId: string) => void;
   onDisableProfile: (profileId: string) => void;
@@ -187,6 +188,8 @@ function renderProfileRow(
   const isBusy =
     props.modelAuthBusyKey != null &&
     (props.modelAuthBusyKey === `promote:${provider.provider}:${profile.profileId}` ||
+      props.modelAuthBusyKey === `move-order:${provider.provider}:${profile.profileId}:up` ||
+      props.modelAuthBusyKey === `move-order:${provider.provider}:${profile.profileId}:down` ||
       props.modelAuthBusyKey === `clear-cooldown:${profile.profileId}` ||
       props.modelAuthBusyKey === `disable:${profile.profileId}` ||
       props.modelAuthBusyKey === `enable:${profile.profileId}` ||
@@ -195,6 +198,24 @@ function renderProfileRow(
     profile.unusableKind === "disabled" && profile.disabledReason === "manual";
   const canDisable = profile.unusableKind === "available" || profile.unusableKind === "cooldown";
   const isDeleteConfirming = props.modelAuthDeleteConfirmProfileId === profile.profileId;
+  const profileIndex = provider.profiles.findIndex((entry) => entry.profileId === profile.profileId);
+  const canReorder = provider.profiles.length > 1 && profileIndex >= 0;
+  const moveUpDisabled = Boolean(props.modelAuthBusyKey) || isBusy || !canReorder || profileIndex === 0;
+  const moveDownDisabled =
+    Boolean(props.modelAuthBusyKey) ||
+    isBusy ||
+    !canReorder ||
+    profileIndex === provider.profiles.length - 1;
+  const moveUpTitle = !canReorder
+    ? t("overview.accounts.moveDisabledSingle")
+    : profileIndex === 0
+      ? t("overview.accounts.moveUpDisabledTop")
+      : "";
+  const moveDownTitle = !canReorder
+    ? t("overview.accounts.moveDisabledSingle")
+    : profileIndex === provider.profiles.length - 1
+      ? t("overview.accounts.moveDownDisabledBottom")
+      : "";
   const makePrimaryDisabled = Boolean(props.modelAuthBusyKey) || profile.isCurrent;
   const makePrimaryTitle = profile.isCurrent
     ? t("overview.accounts.makePrimaryDisabledCurrent")
@@ -245,6 +266,28 @@ function renderProfileRow(
         </div>
       </div>
       <div class="overview-auth-profile__actions">
+        <button
+          class="btn btn--sm"
+          data-auth-order-move="up"
+          data-profile-id=${profile.profileId}
+          ?disabled=${moveUpDisabled}
+          title=${moveUpTitle}
+          aria-label=${t("overview.accounts.moveUp")}
+          @click=${() => props.onMoveProfileOrder(provider.provider, profile.profileId, "up")}
+        >
+          ↑
+        </button>
+        <button
+          class="btn btn--sm"
+          data-auth-order-move="down"
+          data-profile-id=${profile.profileId}
+          ?disabled=${moveDownDisabled}
+          title=${moveDownTitle}
+          aria-label=${t("overview.accounts.moveDown")}
+          @click=${() => props.onMoveProfileOrder(provider.provider, profile.profileId, "down")}
+        >
+          ↓
+        </button>
         <button
           class="btn btn--sm"
           ?disabled=${makePrimaryDisabled}

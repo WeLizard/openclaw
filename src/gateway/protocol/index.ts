@@ -144,6 +144,8 @@ import {
   ModelsAuthProfileEnableParamsSchema,
   type ModelsAuthOrderClearParams,
   ModelsAuthOrderClearParamsSchema,
+  type ModelsAuthOrderMoveParams,
+  ModelsAuthOrderMoveParamsSchema,
   type ModelsAuthPromoteParams,
   ModelsAuthPromoteParamsSchema,
   type ModelsAuthStatusParams,
@@ -401,6 +403,8 @@ export const validateModelsAuthPromoteParams =
   ajv.compile<ModelsAuthPromoteParams>(ModelsAuthPromoteParamsSchema);
 export const validateModelsAuthOrderClearParams =
   ajv.compile<ModelsAuthOrderClearParams>(ModelsAuthOrderClearParamsSchema);
+export const validateModelsAuthOrderMoveParams =
+  ajv.compile<ModelsAuthOrderMoveParams>(ModelsAuthOrderMoveParamsSchema);
 export const validateModelsAuthCooldownClearParams =
   ajv.compile<ModelsAuthCooldownClearParams>(ModelsAuthCooldownClearParamsSchema);
 export const validateModelsListParams = ajv.compile<ModelsListParams>(ModelsListParamsSchema);
@@ -592,6 +596,7 @@ export {
   ModelsAuthStatusParamsSchema,
   ModelsAuthPromoteParamsSchema,
   ModelsAuthOrderClearParamsSchema,
+  ModelsAuthOrderMoveParamsSchema,
   ModelsAuthCooldownClearParamsSchema,
   ModelsAuthProfileDisableParamsSchema,
   ModelsAuthProfileEnableParamsSchema,

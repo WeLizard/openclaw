@@ -19,6 +19,7 @@ import {
   validateModelsAuthProfileDisableParams,
   validateModelsAuthProfileEnableParams,
   validateModelsAuthOrderClearParams,
+  validateModelsAuthOrderMoveParams,
   validateModelsAuthPromoteParams,
   validateModelsAuthStatusParams,
   validateModelsListParams,
@@ -163,6 +164,95 @@ export const modelsHandlers: GatewayRequestHandlers = {
         !status.providers.some((entry) => entry.provider === provider && entry.hasStoredOrderOverride)
       ) {
         respond(true, status, undefined);
+        return;
+      }
+      respond(true, getModelsAuthStatus(status.agentId), undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+  "models.auth.order.move": async ({ params, respond }) => {
+    if (!validateModelsAuthOrderMoveParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid models.auth.order.move params: ${formatValidationErrors(validateModelsAuthOrderMoveParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    try {
+      const status = getModelsAuthStatus(typeof params.agentId === "string" ? params.agentId.trim() : undefined);
+      const provider = normalizeProviderId(String(params.provider ?? "").trim());
+      const profileId = String(params.profileId ?? "").trim();
+      const direction = params.direction === "down" ? "down" : "up";
+      const entry = status.providers.find((item) => item.provider === provider);
+      if (!entry) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unknown provider "${provider}"`),
+        );
+        return;
+      }
+      if (!entry.profiles.some((profile) => profile.profileId === profileId)) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `profile "${profileId}" is not available for provider "${provider}"`,
+          ),
+        );
+        return;
+      }
+      const currentOrder = entry.currentOrder.length
+        ? entry.currentOrder
+        : resolveAuthProfileOrder({
+            store: ensureAuthProfileStore(status.agentDir, { allowKeychainPrompt: false }),
+            provider,
+          });
+      const knownProfileIds = [
+        ...currentOrder,
+        ...entry.profiles
+          .map((profile) => profile.profileId)
+          .filter((id) => !currentOrder.includes(id)),
+      ];
+      const currentIndex = knownProfileIds.indexOf(profileId);
+      if (currentIndex < 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `profile "${profileId}" is not available for provider "${provider}"`,
+          ),
+        );
+        return;
+      }
+      const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= knownProfileIds.length) {
+        respond(true, status, undefined);
+        return;
+      }
+      const nextOrder = [...knownProfileIds];
+      [nextOrder[currentIndex], nextOrder[targetIndex]] = [
+        nextOrder[targetIndex]!,
+        nextOrder[currentIndex]!,
+      ];
+      const updated = await setAuthProfileOrder({
+        agentDir: status.agentDir,
+        provider,
+        order: nextOrder,
+      });
+      if (!updated) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, "Failed to update auth-profiles.json (lock busy?)."),
+        );
         return;
       }
       respond(true, getModelsAuthStatus(status.agentId), undefined);

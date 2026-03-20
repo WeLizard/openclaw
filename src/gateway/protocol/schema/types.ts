@@ -95,6 +95,7 @@ export type ModelChoice = SchemaType<"ModelChoice">;
 export type ModelsAuthStatusParams = SchemaType<"ModelsAuthStatusParams">;
 export type ModelsAuthPromoteParams = SchemaType<"ModelsAuthPromoteParams">;
 export type ModelsAuthOrderClearParams = SchemaType<"ModelsAuthOrderClearParams">;
+export type ModelsAuthOrderMoveParams = SchemaType<"ModelsAuthOrderMoveParams">;
 export type ModelsAuthCooldownClearParams = SchemaType<"ModelsAuthCooldownClearParams">;
 export type ModelsAuthProfileDisableParams = SchemaType<"ModelsAuthProfileDisableParams">;
 export type ModelsAuthProfileEnableParams = SchemaType<"ModelsAuthProfileEnableParams">;

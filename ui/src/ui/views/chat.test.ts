@@ -256,6 +256,7 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     onRefreshLogs: () => undefined,
     onModelAuthRefresh: () => undefined,
     onPromoteProfile: () => undefined,
+    onMoveProfileOrder: () => undefined,
     onClearProviderOrder: () => undefined,
     onClearProfileCooldown: () => undefined,
     onDisableProfile: () => undefined,
@@ -542,6 +543,60 @@ describe("chat view", () => {
         (button) => button.textContent?.trim() === "Add account",
       ),
     ).toBe(true);
+  });
+
+  it("renders explicit move controls for auth profile rotation", async () => {
+    const container = document.createElement("div");
+    const onMoveProfileOrder = vi.fn();
+    await i18n.setLocale("en");
+    const status = createModelAuthStatus();
+    status.providers[0].counts.total = 2;
+    status.providers[0].counts.available = 2;
+    status.providers[0].currentOrder = ["cliproxy:default", "cliproxy:backup"];
+    status.providers[0].profiles.push({
+      profileId: "cliproxy:backup",
+      label: "cliproxy:backup",
+      provider: "cliproxy",
+      type: "api_key",
+      healthStatus: "ok",
+      unusableKind: "available",
+      unusableRemainingMs: null,
+      disabledReason: null,
+      remainingMs: null,
+      inStoredOrder: false,
+      isCurrent: false,
+      isLastGood: false,
+      lastUsed: null,
+      errorCount: 0,
+    });
+
+    render(
+      renderOverview(
+        createOverviewProps({
+          connected: true,
+          modelAuthStatus: status,
+          onMoveProfileOrder,
+        }),
+      ),
+      container,
+    );
+
+    const upButtons = [
+      ...container.querySelectorAll<HTMLButtonElement>('button[data-auth-order-move="up"]'),
+    ];
+    const downButtons = [
+      ...container.querySelectorAll<HTMLButtonElement>('button[data-auth-order-move="down"]'),
+    ];
+
+    expect(upButtons).toHaveLength(2);
+    expect(downButtons).toHaveLength(2);
+    expect(upButtons[0]?.disabled).toBe(true);
+    expect(upButtons[0]?.title).toBe("This profile is already first in the current rotation order.");
+    expect(downButtons[1]?.disabled).toBe(true);
+    expect(downButtons[1]?.title).toBe("This profile is already last in the current rotation order.");
+
+    upButtons[1]?.click();
+    expect(onMoveProfileOrder).toHaveBeenCalledWith("cliproxy", "cliproxy:backup", "up");
   });
 
   it("renders compacting indicator as a badge", () => {
