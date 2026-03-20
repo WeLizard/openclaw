@@ -151,6 +151,34 @@ const LINE_TRANSLATIONS_RU = new Map<string, string>([
   ["Model configured", "Модель настроена"],
   ["Auth setup complete.", "Настройка авторизации завершена."],
   ["Provider auth", "Авторизация провайдера"],
+  ["Qwen account label", "Метка аккаунта Qwen"],
+  [
+    "Qwen did not expose a stable account identity for this login.",
+    "Qwen не отдал стабильный идентификатор аккаунта для этого входа.",
+  ],
+  [
+    "Enter a short label to store this account as a separate profile.",
+    "Введи короткую метку, чтобы сохранить этот аккаунт как отдельный профиль.",
+  ],
+  [
+    "Use distinct Qwen accounts here: re-authorizing the same upstream account can invalidate older refresh tokens.",
+    "Здесь используй разные аккаунты Qwen: повторная авторизация того же upstream-аккаунта может инвалидировать старые refresh token.",
+  ],
+  ["Qwen profile label", "Метка профиля Qwen"],
+  [
+    "Enter a short label such as work or backup",
+    "Введи короткую метку, например work или backup",
+  ],
+  ["Existing profile", "Существующий профиль"],
+  [
+    "Re-authenticating the same upstream OAuth account can invalidate the previous refresh token.",
+    "Повторная авторизация того же upstream OAuth-аккаунта может инвалидировать предыдущий refresh token.",
+  ],
+  [
+    "Use separate profiles for distinct accounts. Replace this profile only when you intend to refresh it.",
+    "Используй отдельные профили для разных аккаунтов. Заменяй этот профиль только если действительно хочешь его переавторизовать.",
+  ],
+  ["Auth unchanged", "Авторизация не изменена"],
   ["How do you want to hatch your bot?", "Как хочешь запустить своего бота?"],
   ["Hatch in TUI (recommended)", "Запустить в TUI (рекомендуется)"],
   ["Open the Web UI", "Открыть Web UI"],
@@ -225,6 +253,18 @@ function translateRuLine(line: string): string {
   match = line.match(/^Default model set to (.+)$/);
   if (match) {
     return `Модель по умолчанию установлена: ${match[1]}`;
+  }
+  match = line.match(/^Auth profile already exists: (.+)\.$/);
+  if (match) {
+    return `Профиль авторизации уже существует: ${match[1]}.`;
+  }
+  match = line.match(/^Replace existing profile (.+)\?$/);
+  if (match) {
+    return `Заменить существующий профиль ${match[1]}?`;
+  }
+  match = line.match(/^Kept existing auth profile (.+)\.$/);
+  if (match) {
+    return `Сохранил существующий профиль авторизации ${match[1]}.`;
   }
   match = line.match(
     /^Model not found: (.+)\. Update agents\.defaults\.model or run \/models list\.$/,
