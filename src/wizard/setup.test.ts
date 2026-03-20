@@ -319,6 +319,50 @@ describe("runSetupWizard", () => {
     expect(runTui).not.toHaveBeenCalled();
   });
 
+  it("keeps provider auth login as a short auth-only flow", async () => {
+    promptAuthChoiceGrouped.mockClear();
+    promptAuthChoiceGrouped.mockResolvedValueOnce("qwen-portal");
+    applyAuthChoice.mockClear();
+    configureGatewayForSetup.mockClear();
+    setupChannels.mockClear();
+    setupSkills.mockClear();
+    finalizeSetupWizard.mockClear();
+    writeConfigFile.mockClear();
+    logConfigUpdated.mockClear();
+
+    const prompter = buildWizardPrompter({});
+    const runtime = createRuntime();
+
+    await runSetupWizard(
+      {
+        intent: "models-auth-login",
+        provider: "qwen-portal",
+        oauthOnly: true,
+      },
+      runtime,
+      prompter,
+    );
+
+    expect(promptAuthChoiceGrouped).toHaveBeenCalledWith(
+      expect.objectContaining({
+        includeSkip: false,
+        provider: "qwen-portal",
+        oauthOnly: true,
+      }),
+    );
+    expect(applyAuthChoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authChoice: "qwen-portal",
+        setDefaultModel: false,
+      }),
+    );
+    expect(configureGatewayForSetup).not.toHaveBeenCalled();
+    expect(setupChannels).not.toHaveBeenCalled();
+    expect(setupSkills).not.toHaveBeenCalled();
+    expect(finalizeSetupWizard).not.toHaveBeenCalled();
+    expect(prompter.outro).toHaveBeenCalledWith("Auth setup complete.");
+  });
+
   async function runTuiHatchTest(params: {
     writeBootstrapFile: boolean;
     expectedMessage: string | undefined;

@@ -237,6 +237,70 @@ describe("finalizeSetupWizard", () => {
     );
   });
 
+  it("falls back to Web UI hatch when TUI is unavailable", async () => {
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+    const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
+    Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
+
+    const select = vi.fn(async (params: { message: string; options?: Array<{ value: string }> }) => {
+      if (params.message === "How do you want to hatch your bot?") {
+        expect(params.options?.map((option) => option.value)).toEqual(["web", "later"]);
+        return "web";
+      }
+      return "later";
+    });
+    const note = vi.fn(async () => {});
+    const prompter = buildWizardPrompter({
+      select: select as never,
+      note,
+      confirm: vi.fn(async () => false),
+    });
+
+    try {
+      await finalizeSetupWizard({
+        flow: "quickstart",
+        opts: {
+          acceptRisk: true,
+          authChoice: "skip",
+          installDaemon: false,
+          skipHealth: true,
+          skipUi: false,
+        },
+        baseConfig: {},
+        nextConfig: {},
+        workspaceDir: "/tmp",
+        settings: {
+          port: 18789,
+          bind: "loopback",
+          authMode: "token",
+          gatewayToken: "test-token",
+          tailscaleMode: "off",
+          tailscaleResetOnExit: false,
+        },
+        prompter,
+        runtime: createRuntime(),
+      });
+    } finally {
+      if (stdinDescriptor) {
+        Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+      } else {
+        delete (process.stdin as { isTTY?: boolean }).isTTY;
+      }
+      if (stdoutDescriptor) {
+        Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+      } else {
+        delete (process.stdout as { isTTY?: boolean }).isTTY;
+      }
+    }
+
+    expect(note).toHaveBeenCalledWith(
+      "TUI hatch is unavailable from this session. Open the Web UI instead.",
+      "Web UI",
+    );
+    expect(runTui).not.toHaveBeenCalled();
+  });
+
   it("does not persist resolved SecretRef token in daemon install plan", async () => {
     const prompter = buildWizardPrompter({
       select: vi.fn(async () => "later") as never,

@@ -3,6 +3,7 @@
 
 export { definePluginEntry } from "./core.js";
 export { buildOauthProviderAuthResult } from "./provider-auth-result.js";
+export { validateProviderProfileId } from "../plugins/provider-auth-conflicts.js";
 export type {
   OpenClawPluginApi,
   ProviderAuthContext,

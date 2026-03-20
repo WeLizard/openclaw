@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { OnboardMode } from "../../commands/onboard-types.js";
-import { defaultRuntime } from "../../runtime.js";
+import { createNonExitingRuntime } from "../../runtime.js";
 import { localizeWizardPrompter } from "../../wizard/localized-prompter.js";
 import { WizardSession } from "../../wizard/session.js";
 import {
@@ -80,7 +80,7 @@ export const wizardHandlers: GatewayRequestHandlers = {
     const session = new WizardSession((prompter) =>
       context.wizardRunner(
         opts,
-        defaultRuntime,
+        createNonExitingRuntime(),
         localizeWizardPrompter(prompter, opts.locale),
       ),
     );

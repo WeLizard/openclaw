@@ -151,6 +151,16 @@ const LINE_TRANSLATIONS_RU = new Map<string, string>([
   ["Model configured", "Модель настроена"],
   ["Auth setup complete.", "Настройка авторизации завершена."],
   ["Provider auth", "Авторизация провайдера"],
+  ["How do you want to hatch your bot?", "Как хочешь запустить своего бота?"],
+  ["Hatch in TUI (recommended)", "Запустить в TUI (рекомендуется)"],
+  ["Open the Web UI", "Открыть Web UI"],
+  ["Do this later", "Сделать это позже"],
+  ["Start TUI (best option!)", "Запуск TUI (лучший вариант!)"],
+  ["Web UI", "Web UI"],
+  [
+    "TUI hatch is unavailable from this session. Open the Web UI instead.",
+    "Запуск через TUI недоступен из этой сессии. Вместо этого открой Web UI.",
+  ],
   [
     "Config is invalid. Fix it first, then re-run auth setup.",
     "Конфиг сейчас невалиден. Сначала исправь его, потом повтори настройку авторизации.",

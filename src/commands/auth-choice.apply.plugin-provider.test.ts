@@ -20,8 +20,15 @@ vi.mock("../plugins/provider-auth-choice.runtime.js", () => ({
 }));
 
 const upsertAuthProfile = vi.hoisted(() => vi.fn());
+const loadAuthProfileStoreForRuntime = vi.hoisted(() =>
+  vi.fn(() => ({
+    profiles: {},
+    usageStats: {},
+  })),
+);
 vi.mock("../agents/auth-profiles.js", () => ({
   upsertAuthProfile,
+  loadAuthProfileStoreForRuntime,
 }));
 
 const resolveDefaultAgentId = vi.hoisted(() => vi.fn(() => "default"));
@@ -104,6 +111,10 @@ describe("applyAuthChoiceLoadedPluginProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     applyAuthProfileConfig.mockImplementation((config) => config);
+    loadAuthProfileStoreForRuntime.mockReturnValue({
+      profiles: {},
+      usageStats: {},
+    });
   });
 
   it("returns an agent model override when default model application is deferred", async () => {

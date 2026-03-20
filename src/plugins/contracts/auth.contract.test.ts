@@ -95,11 +95,17 @@ function buildPrompter(): WizardPrompter {
   };
 }
 
-function buildAuthContext() {
+function buildAuthContext(
+  overrides: Partial<{
+    prompter: WizardPrompter;
+    opts: Record<string, unknown>;
+  }> = {},
+) {
   return {
     config: {},
-    prompter: buildPrompter(),
+    prompter: overrides.prompter ?? buildPrompter(),
     runtime: createNonExitingRuntime(),
+    ...(overrides.opts ? { opts: overrides.opts } : {}),
     isRemote: false,
     openUrl: async () => {},
     oauth: {
@@ -219,8 +225,69 @@ describe("provider auth contract", () => {
     expect(result?.notes).toEqual(
       expect.arrayContaining([
         expect.stringContaining("auto-refresh"),
+        expect.stringContaining("distinct Qwen accounts"),
         expect.stringContaining("Base URL defaults"),
       ]),
+    );
+  });
+
+  it("honors explicit qwen profile ids from auth opts", async () => {
+    const provider = requireProvider(registerProviders(qwenPortalPlugin), "qwen-portal");
+    loginQwenPortalOAuthMock.mockResolvedValueOnce({
+      access: "access-token",
+      refresh: "refresh-token",
+      expires: 1_700_000_000_000,
+      resourceUrl: "portal.qwen.ai",
+    });
+
+    const result = await provider.auth[0]?.run(
+      buildAuthContext({
+        opts: {
+          profileId: "qwen-portal:work",
+        },
+      }) as never,
+    );
+
+    expect(result?.profiles[0]?.profileId).toBe("qwen-portal:work");
+  });
+
+  it("prompts for a label when qwen already has a stored profile and identity is unavailable", async () => {
+    const provider = requireProvider(registerProviders(qwenPortalPlugin), "qwen-portal");
+    authStore.profiles["qwen-portal:default"] = {
+      type: "oauth",
+      provider: "qwen-portal",
+      access: "old-access-token",
+      refresh: "old-refresh-token",
+      expires: 1_700_000_000_000,
+    };
+    const note = vi.fn(async () => {});
+    const text = vi.fn(async () => "Work Account");
+    loginQwenPortalOAuthMock.mockResolvedValueOnce({
+      access: "access-token",
+      refresh: "refresh-token",
+      expires: 1_700_000_000_000,
+      resourceUrl: "portal.qwen.ai",
+    });
+
+    const result = await provider.auth[0]?.run(
+      buildAuthContext({
+        prompter: {
+          ...buildPrompter(),
+          note,
+          text,
+        },
+      }) as never,
+    );
+
+    expect(text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Qwen profile label",
+      }),
+    );
+    expect(result?.profiles[0]?.profileId).toBe("qwen-portal:work-account");
+    expect(note).toHaveBeenCalledWith(
+      expect.stringContaining("distinct Qwen accounts"),
+      "Qwen account label",
     );
   });
 

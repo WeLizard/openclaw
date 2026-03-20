@@ -49,6 +49,7 @@ export type { PluginRuntime } from "./runtime/types.js";
 export type { AnyAgentTool } from "../agents/tools/common.js";
 
 export type ProviderAuthOptionBag = {
+  profileId?: string;
   token?: string;
   tokenProvider?: string;
   secretInputMode?: SecretInputMode;

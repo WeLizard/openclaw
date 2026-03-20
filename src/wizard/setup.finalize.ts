@@ -340,6 +340,7 @@ export async function finalizeSetupWizard(
   let seededInBackground = false;
   let hatchChoice: "tui" | "web" | "later" | null = null;
   let launchedTui = false;
+  const canLaunchTui = process.stdin.isTTY !== false && process.stdout.isTTY !== false;
 
   if (!opts.skipUi && gatewayProbe.ok) {
     if (hasBootstrap) {
@@ -367,14 +368,21 @@ export async function finalizeSetupWizard(
       "Token",
     );
 
+    if (!canLaunchTui) {
+      await prompter.note(
+        "TUI hatch is unavailable from this session. Open the Web UI instead.",
+        "Web UI",
+      );
+    }
+
     hatchChoice = await prompter.select({
       message: "How do you want to hatch your bot?",
       options: [
-        { value: "tui", label: "Hatch in TUI (recommended)" },
+        ...(canLaunchTui ? [{ value: "tui", label: "Hatch in TUI (recommended)" }] : []),
         { value: "web", label: "Open the Web UI" },
         { value: "later", label: "Do this later" },
       ],
-      initialValue: "tui",
+      initialValue: canLaunchTui ? "tui" : "web",
     });
 
     if (hatchChoice === "tui") {

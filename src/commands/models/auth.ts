@@ -24,9 +24,14 @@ import { parseDurationMs } from "../../cli/parse-duration.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { logConfigUpdated } from "../../config/logging.js";
 import { applyAuthProfileConfig } from "../../plugins/provider-auth-helpers.js";
+import {
+  confirmAuthProfileOverwrites,
+  validateProviderProfileId,
+} from "../../plugins/provider-auth-conflicts.js";
 import { resolvePluginProviders } from "../../plugins/providers.js";
 import type {
   ProviderAuthMethod,
+  ProviderAuthOptionBag,
   ProviderAuthResult,
   ProviderPlugin,
 } from "../../plugins/types.js";
@@ -217,7 +222,19 @@ async function persistProviderAuthResult(params: {
   runtime: RuntimeEnv;
   prompter: ReturnType<typeof createClackPrompter>;
   setDefault?: boolean;
-}) {
+  confirmOverwrite?: boolean;
+}): Promise<boolean> {
+  if (params.confirmOverwrite) {
+    const confirmed = await confirmAuthProfileOverwrites({
+      profiles: params.result.profiles,
+      agentDir: params.agentDir,
+      prompter: params.prompter,
+    });
+    if (!confirmed) {
+      return false;
+    }
+  }
+
   for (const profile of params.result.profiles) {
     upsertAuthProfile({
       profileId: profile.profileId,
@@ -260,6 +277,8 @@ async function persistProviderAuthResult(params: {
   if (params.result.notes && params.result.notes.length > 0) {
     await params.prompter.note(params.result.notes.join("\n"), "Provider notes");
   }
+
+  return true;
 }
 
 async function runProviderAuthMethod(params: {
@@ -271,6 +290,8 @@ async function runProviderAuthMethod(params: {
   runtime: RuntimeEnv;
   prompter: ReturnType<typeof createClackPrompter>;
   setDefault?: boolean;
+  authOptions?: Partial<ProviderAuthOptionBag>;
+  confirmOverwrite?: boolean;
 }) {
   await clearStaleProfileLockouts(params.provider.id, params.agentDir);
 
@@ -280,6 +301,7 @@ async function runProviderAuthMethod(params: {
     workspaceDir: params.workspaceDir,
     prompter: params.prompter,
     runtime: params.runtime,
+    opts: params.authOptions,
     allowSecretRefPrompt: false,
     isRemote: isRemoteEnvironment(),
     openUrl: async (url) => {
@@ -296,6 +318,7 @@ async function runProviderAuthMethod(params: {
     runtime: params.runtime,
     prompter: params.prompter,
     setDefault: params.setDefault,
+    confirmOverwrite: params.confirmOverwrite,
   });
 }
 
@@ -494,6 +517,7 @@ export async function modelsAuthAddCommand(_opts: Record<string, never>, runtime
 type LoginOptions = {
   provider?: string;
   method?: string;
+  profileId?: string;
   setDefault?: boolean;
   yes?: boolean;
 };
@@ -574,6 +598,10 @@ export async function modelsAuthLoginCommand(opts: LoginOptions, runtime: Runtim
     throw new Error("Unknown auth method. Use --method <id> to select one.");
   }
 
+  const profileId = opts.profileId?.trim()
+    ? validateProviderProfileId(opts.profileId, selectedProvider.id)
+    : undefined;
+
   await runProviderAuthMethod({
     config,
     agentDir,
@@ -583,5 +611,7 @@ export async function modelsAuthLoginCommand(opts: LoginOptions, runtime: Runtim
     runtime,
     prompter,
     setDefault: opts.setDefault,
+    authOptions: profileId ? { profileId } : undefined,
+    confirmOverwrite: true,
   });
 }

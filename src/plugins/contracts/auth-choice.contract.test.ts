@@ -180,6 +180,65 @@ describe("provider auth-choice contract", () => {
     });
   });
 
+  it("adds a second qwen profile through the shared auth helper instead of overwriting default", async () => {
+    await setupTempState();
+    const qwenProvider = requireProvider(registerProviders(qwenPortalPlugin), "qwen-portal");
+    loginQwenPortalOAuthMock
+      .mockResolvedValueOnce({
+        access: "default-access-token",
+        refresh: "default-refresh-token",
+        expires: 1_700_000_000_000,
+        resourceUrl: "portal.qwen.ai",
+      })
+      .mockResolvedValueOnce({
+        access: "work-access-token",
+        refresh: "work-refresh-token",
+        expires: 1_700_000_000_000,
+        resourceUrl: "portal.qwen.ai",
+      });
+
+    await runProviderPluginAuthMethod({
+      config: {},
+      prompter: createWizardPrompter({}),
+      runtime: createExitThrowingRuntime(),
+      method: qwenProvider.auth[0],
+      allowSecretRefPrompt: false,
+    });
+
+    const secondPrompter = createWizardPrompter({
+      text: vi.fn(async () => "work"),
+      note: vi.fn(async () => {}),
+      confirm: vi.fn(async () => true),
+    });
+    const result = await runProviderPluginAuthMethod({
+      config: {},
+      prompter: secondPrompter,
+      runtime: createExitThrowingRuntime(),
+      method: qwenProvider.auth[0],
+      allowSecretRefPrompt: false,
+    });
+
+    expect(result.config.auth?.profiles?.["qwen-portal:work"]).toMatchObject({
+      provider: "qwen-portal",
+      mode: "oauth",
+    });
+    const stored = await readAuthProfilesForAgent<{ profiles?: Record<string, StoredAuthProfile> }>(
+      requireOpenClawAgentDir(),
+    );
+    expect(stored.profiles?.["qwen-portal:default"]).toMatchObject({
+      type: "oauth",
+      provider: "qwen-portal",
+      access: "default-access-token",
+      refresh: "default-refresh-token",
+    });
+    expect(stored.profiles?.["qwen-portal:work"]).toMatchObject({
+      type: "oauth",
+      provider: "qwen-portal",
+      access: "work-access-token",
+      refresh: "work-refresh-token",
+    });
+  });
+
   it("returns qwen portal default-model overrides for deferred callers", async () => {
     await setupTempState();
     const qwenProvider = requireProvider(registerProviders(qwenPortalPlugin), "qwen-portal");

@@ -25,6 +25,7 @@ import {
   resolveAgentConfig,
   resolveAgentEmoji,
   resolveEffectiveModelFallbacks,
+  resolveModelFallbacks,
   resolveModelLabel,
   resolveModelPrimary,
 } from "./agents-utils.ts";
@@ -94,6 +95,8 @@ export type AgentsProps = {
   onConfigSave: () => void;
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
+  onImageModelChange: (modelId: string | null) => void;
+  onImageFallbacksChange: (fallbacks: string[]) => void;
   onChannelsRefresh: () => void;
   onCronRefresh: () => void;
   onCronRunNow?: (jobId: string) => void;
@@ -200,6 +203,8 @@ export function renderAgents(props: AgentsProps) {
                         onConfigSave: props.onConfigSave,
                         onModelChange: props.onModelChange,
                         onModelFallbacksChange: props.onModelFallbacksChange,
+                        onImageModelChange: props.onImageModelChange,
+                        onImageFallbacksChange: props.onImageFallbacksChange,
                         onSelectPanel: props.onSelectPanel,
                       })
                     : nothing
@@ -377,6 +382,8 @@ function renderAgentOverview(params: {
   onConfigSave: () => void;
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
+  onImageModelChange: (modelId: string | null) => void;
+  onImageFallbacksChange: (fallbacks: string[]) => void;
   onSelectPanel: (panel: AgentsPanel) => void;
 }) {
   const {
@@ -393,6 +400,8 @@ function renderAgentOverview(params: {
     onConfigSave,
     onModelChange,
     onModelFallbacksChange,
+    onImageModelChange,
+    onImageFallbacksChange,
   } = params;
   const config = resolveAgentConfig(configForm, agent.id);
   const workspaceFromFiles =
@@ -418,6 +427,14 @@ function renderAgentOverview(params: {
     config.defaults?.model,
   );
   const fallbackText = modelFallbacks ? modelFallbacks.join(", ") : "";
+  const imageModel = resolveModelLabel(config.defaults?.imageModel);
+  const imagePrimary =
+    resolveModelPrimary(config.defaults?.imageModel) ||
+    (typeof config.defaults?.imageModel === "string"
+      ? config.defaults.imageModel.trim() || null
+      : null);
+  const imageFallbacks = resolveModelFallbacks(config.defaults?.imageModel) ?? [];
+  const imageFallbackText = imageFallbacks.join(", ");
   const identityName =
     agentIdentity?.name?.trim() ||
     agent.identity?.name?.trim() ||
@@ -449,6 +466,10 @@ function renderAgentOverview(params: {
           <div class="mono">${model}</div>
         </div>
         <div class="agent-kv">
+          <div class="label">${t("agentsPage.overview.imageModel")}</div>
+          <div class="mono">${imageModel}</div>
+        </div>
+        <div class="agent-kv">
           <div class="label">${t("agentsPage.overview.identityName")}</div>
           <div>${identityName}</div>
           ${identityStatus ? html`<div class="agent-kv-sub muted">${identityStatus}</div>` : nothing}
@@ -471,6 +492,9 @@ function renderAgentOverview(params: {
 
       <div class="agent-model-select" style="margin-top: 20px;">
         <div class="label">${t("agentsPage.overview.modelSelection")}</div>
+        <div class="muted" style="margin: 8px 0 12px;">
+          ${t("agentsPage.overview.textRouting")}
+        </div>
         <div class="row" style="gap: 12px; flex-wrap: wrap;">
           <label class="field" style="min-width: 260px; flex: 1;">
             <span>${isDefault
@@ -511,6 +535,36 @@ function renderAgentOverview(params: {
                 )}
             />
           </label>
+        </div>
+        <div class="muted" style="margin: 16px 0 12px;">
+          ${t("agentsPage.overview.imageRouting")}
+        </div>
+        <div class="row" style="gap: 12px; flex-wrap: wrap;">
+          <label class="field" style="min-width: 260px; flex: 1;">
+            <span>${t("agentsPage.overview.imageModelDefault")}</span>
+            <select
+              .value=${imagePrimary ?? ""}
+              ?disabled=${!configForm || configLoading || configSaving}
+              @change=${(e: Event) =>
+                onImageModelChange((e.target as HTMLSelectElement).value || null)}
+            >
+              <option value="">${t("agentsPage.overview.imageModelAuto")}</option>
+              ${buildModelOptions(configForm, imagePrimary ?? undefined)}
+            </select>
+          </label>
+          <label class="field" style="min-width: 260px; flex: 1;">
+            <span>${t("agentsPage.overview.imageFallbacks")}</span>
+            <input
+              .value=${imageFallbackText}
+              ?disabled=${!configForm || configLoading || configSaving}
+              placeholder=${t("agentsPage.overview.fallbacksPlaceholder")}
+              @input=${(e: Event) =>
+                onImageFallbacksChange(parseFallbackList((e.target as HTMLInputElement).value))}
+            />
+          </label>
+        </div>
+        <div class="agent-kv-sub muted" style="margin-top: 10px;">
+          ${t("agentsPage.overview.imageRoutingHint")}
         </div>
         <div class="row" style="justify-content: flex-end; gap: 8px;">
           <button class="btn btn--sm" ?disabled=${configLoading} @click=${onConfigReload}>

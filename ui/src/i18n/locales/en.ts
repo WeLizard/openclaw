@@ -135,6 +135,8 @@ export const en: TranslationMap = {
       addProvider: "Add provider",
       addProviderHint:
         "Launches the same auth wizard as `openclaw models auth login`, including Custom Provider for OpenAI-compatible and Anthropic-compatible endpoints.",
+      multiAccountHint:
+        "Add multiple accounts to the same provider. Auth profiles rotate before model fallbacks.",
       empty: "Account status has not been loaded yet.",
       noProviders: "No model providers with account state were found.",
       missingProviders:
@@ -152,12 +154,16 @@ export const en: TranslationMap = {
       countAvailable: "Available",
       countBlocked: "Blocked",
       activeProfile: "Active",
+      rotationOrder: "Rotation order",
+      rotationHint:
+        "Profiles rotate before model fallbacks. Use Make primary to move a healthy account to the front.",
       noProfiles: "No profiles are stored for this provider.",
       staticConfig:
         "This provider uses a static API key from openclaw.json; auth profiles are not required.",
       envConfig:
         "This provider uses an API key from environment variables; auth profiles are not required.",
       makePrimary: "Make primary",
+      addAccount: "Add account",
       oauthReauth: "Auth setup",
       clearCooldown: "Clear cooldown",
       disableFromPool: "Disable in pool",
@@ -848,12 +854,20 @@ export const en: TranslationMap = {
       identityEmoji: "Identity Emoji",
       skillsFilter: "Skills Filter",
       modelSelection: "Model selection",
+      textRouting: "Text routing",
+      imageRouting: "Image routing (global)",
       primaryModelDefault: "Primary model",
       primaryModelPlain: "Primary model override",
+      imageModel: "Image model",
+      imageModelDefault: "Image model",
+      imageModelAuto: "Use primary model automatically",
       inheritDefault: "Inherit default model",
       inheritDefaultWithValue: "Inherit default model ({value})",
       fallbacks: "Fallbacks",
+      imageFallbacks: "Image fallbacks",
       fallbacksPlaceholder: "provider/model, provider/model",
+      imageRoutingHint:
+        "Used when the current text model cannot accept images. Saves to agents.defaults.imageModel.",
     },
     skills: {
       title: "Agent Skills",

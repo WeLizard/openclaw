@@ -22,6 +22,9 @@ export type QwenOAuthToken = {
   refresh: string;
   expires: number;
   resourceUrl?: string;
+  email?: string;
+  accountId?: string;
+  username?: string;
 };
 
 type TokenPending = { status: "pending"; slowDown?: boolean };

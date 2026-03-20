@@ -136,6 +136,8 @@ export const ru: TranslationMap = {
       addProvider: "Добавить провайдера",
       addProviderHint:
         "Открывает тот же auth wizard, что и `openclaw models auth login`, включая Custom Provider для OpenAI-compatible и Anthropic-compatible endpoint'ов.",
+      multiAccountHint:
+        "Можно добавить несколько аккаунтов одного провайдера. Auth-профили ротируются раньше, чем включаются резервные модели.",
       empty: "Статус аккаунтов ещё не загружен.",
       noProviders: "Провайдеры моделей с доступным состоянием аккаунтов не найдены.",
       missingProviders:
@@ -153,12 +155,16 @@ export const ru: TranslationMap = {
       countAvailable: "Доступно",
       countBlocked: "Заблокировано",
       activeProfile: "Активный",
+      rotationOrder: "Порядок ротации",
+      rotationHint:
+        "Профили ротируются раньше, чем включаются резервные модели. Используйте «Сделать основным», чтобы поднять рабочий аккаунт в начало очереди.",
       noProfiles: "Для этого провайдера не сохранены профили.",
       staticConfig:
         "Этот провайдер использует статический API key из openclaw.json; auth-профили для него не требуются.",
       envConfig:
         "Этот провайдер использует ключ из переменных окружения; auth-профили для него не требуются.",
       makePrimary: "Сделать основным",
+      addAccount: "Добавить аккаунт",
       oauthReauth: "Настроить авторизацию",
       clearCooldown: "Сбросить cooldown",
       disableFromPool: "Отключить в пуле",
@@ -926,12 +932,20 @@ export const ru: TranslationMap = {
       identityEmoji: "Эмодзи идентичности",
       skillsFilter: "Фильтр навыков",
       modelSelection: "Выбор модели",
+      textRouting: "Маршрутизация текста",
+      imageRouting: "Маршрутизация изображений (глобально)",
       primaryModelDefault: "Основная модель",
       primaryModelPlain: "Переопределение основной модели",
+      imageModel: "Модель изображений",
+      imageModelDefault: "Модель изображений",
+      imageModelAuto: "Автоматически использовать основную модель",
       inheritDefault: "Наследовать модель по умолчанию",
       inheritDefaultWithValue: "Наследовать модель по умолчанию ({value})",
       fallbacks: "Резервные модели",
+      imageFallbacks: "Резервные модели изображений",
       fallbacksPlaceholder: "provider/model, provider/model",
+      imageRoutingHint:
+        "Используется, когда текущая текстовая модель не умеет работать с изображениями. Сохраняется в agents.defaults.imageModel.",
     },
     skills: {
       title: "Навыки агента",
