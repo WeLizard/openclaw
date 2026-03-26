@@ -62,6 +62,7 @@ describe("resolveDisplayedProviderStatus", () => {
     const entry = {
       provider: "cliproxy",
       status: "static",
+      disabled: false,
       inUse: true,
       effective: { kind: "profiles", detail: "/config/.openclaw/agents/main/agent/auth-profiles.json" },
       counts: { total: 1, oauth: 0, token: 0, apiKey: 1, available: 1, unavailable: 0 },
@@ -94,6 +95,7 @@ describe("resolveDisplayedProviderStatus", () => {
     const entry = {
       provider: "legacy",
       status: "static",
+      disabled: false,
       inUse: false,
       effective: { kind: "models.json", detail: "/config/.openclaw/agents/main/agent/models.json" },
       counts: { total: 0, oauth: 0, token: 0, apiKey: 0, available: 0, unavailable: 0 },

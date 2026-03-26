@@ -266,6 +266,12 @@ function createOverviewProps(overrides: Partial<OverviewProps> = {}): OverviewPr
     onDeleteProfile: () => undefined,
     onStartProviderAuth: () => undefined,
     onStartWizard: () => undefined,
+    onDisableProvider: () => undefined,
+    onEnableProvider: () => undefined,
+    onRequestRemoveProvider: () => undefined,
+    onCancelRemoveProvider: () => undefined,
+    onRemoveProvider: () => undefined,
+    providerDeleteConfirmId: null,
     ...overrides,
   };
 }

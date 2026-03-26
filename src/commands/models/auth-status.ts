@@ -54,6 +54,7 @@ export type ModelsAuthProfileStatus = {
 export type ModelsAuthProviderStatus = {
   provider: string;
   status: "ok" | "expiring" | "expired" | "missing" | "static";
+  disabled: boolean;
   inUse: boolean;
   effective: ProviderAuthOverview["effective"];
   counts: {
@@ -315,6 +316,7 @@ export function getModelsAuthStatus(rawAgentId?: string): ModelsAuthStatusResult
           effectiveKind: entry.effective.kind,
           providerHealthStatus: providerHealth?.status,
         }),
+        disabled: Boolean(cfg.models?.providers?.[providerKey]?.disabled),
         inUse: providersInUse.includes(providerKey),
         effective: entry.effective,
         counts: {

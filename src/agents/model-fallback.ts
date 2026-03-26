@@ -96,6 +96,17 @@ function createModelCandidateCollector(allowlist: Set<string> | null | undefined
   return { candidates, addExplicitCandidate, addAllowlistedCandidate };
 }
 
+function filterDisabledProviders(
+  candidates: ModelCandidate[],
+  cfg: OpenClawConfig | undefined,
+): ModelCandidate[] {
+  if (!cfg?.models?.providers) {
+    return candidates;
+  }
+  const providers = cfg.models.providers;
+  return candidates.filter((c) => !providers[c.provider]?.disabled);
+}
+
 type ModelFallbackErrorHandler = (attempt: {
   provider: string;
   model: string;
@@ -252,7 +263,7 @@ function resolveImageFallbackCandidates(params: {
     addRaw(raw);
   }
 
-  return candidates;
+  return filterDisabledProviders(candidates, params.cfg);
 }
 
 function resolveFallbackCandidates(params: {
@@ -329,7 +340,7 @@ function resolveFallbackCandidates(params: {
     addExplicitCandidate({ provider: primary.provider, model: primary.model });
   }
 
-  return candidates;
+  return filterDisabledProviders(candidates, params.cfg);
 }
 
 const lastProbeAttempt = new Map<string, number>();

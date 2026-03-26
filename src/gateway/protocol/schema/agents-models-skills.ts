@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { type Static, Type } from "@sinclair/typebox";
 import { NonEmptyString } from "./primitives.js";
 
 export const ModelChoiceSchema = Type.Object(
@@ -238,6 +238,24 @@ export const ModelsAuthProfileDeleteParamsSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+export const ModelsProviderRemoveParamsSchema = Type.Object(
+  { provider: NonEmptyString },
+  { additionalProperties: false },
+);
+export type ModelsProviderRemoveParams = Static<typeof ModelsProviderRemoveParamsSchema>;
+
+export const ModelsProviderDisableParamsSchema = Type.Object(
+  { provider: NonEmptyString },
+  { additionalProperties: false },
+);
+export type ModelsProviderDisableParams = Static<typeof ModelsProviderDisableParamsSchema>;
+
+export const ModelsProviderEnableParamsSchema = Type.Object(
+  { provider: NonEmptyString },
+  { additionalProperties: false },
+);
+export type ModelsProviderEnableParams = Static<typeof ModelsProviderEnableParamsSchema>;
 
 export const SkillsStatusParamsSchema = Type.Object(
   {

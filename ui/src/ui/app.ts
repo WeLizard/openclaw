@@ -63,10 +63,13 @@ import {
   clearModelAuthOrder as clearModelAuthOrderInternal,
   deleteModelAuthProfile as deleteModelAuthProfileInternal,
   disableModelAuthProfile as disableModelAuthProfileInternal,
+  disableModelProvider as disableModelProviderInternal,
   enableModelAuthProfile as enableModelAuthProfileInternal,
+  enableModelProvider as enableModelProviderInternal,
   loadModelAuthStatus as loadModelAuthStatusInternal,
   moveModelAuthOrderProfile as moveModelAuthOrderProfileInternal,
   promoteModelAuthProfile as promoteModelAuthProfileInternal,
+  removeModelProvider as removeModelProviderInternal,
 } from "./controllers/model-auth.ts";
 import { loadAvailableModels as loadAvailableModelsInternal } from "./controllers/model-catalog.ts";
 import {
@@ -311,6 +314,7 @@ export class OpenClawApp extends LitElement {
   @state() modelAuthError: string | null = null;
   @state() modelAuthStatus: ModelsAuthStatusResult | null = null;
   @state() modelAuthDeleteConfirmProfileId: string | null = null;
+  @state() modelProviderDeleteConfirmId: string | null = null;
   @state() wizardOpen = false;
   @state() wizardLoading = false;
   @state() wizardBusy = false;
@@ -636,6 +640,33 @@ export class OpenClawApp extends LitElement {
         this.modelAuthDeleteConfirmProfileId = null;
       }
     }
+  }
+
+  handleRequestRemoveProvider(provider: string) {
+    this.modelProviderDeleteConfirmId =
+      this.modelProviderDeleteConfirmId === provider ? null : provider;
+  }
+
+  handleCancelRemoveProvider() {
+    this.modelProviderDeleteConfirmId = null;
+  }
+
+  async handleRemoveModelProvider(provider: string) {
+    try {
+      await removeModelProviderInternal(this, provider);
+    } finally {
+      if (this.modelProviderDeleteConfirmId === provider) {
+        this.modelProviderDeleteConfirmId = null;
+      }
+    }
+  }
+
+  async handleDisableModelProvider(provider: string) {
+    await disableModelProviderInternal(this, provider);
+  }
+
+  async handleEnableModelProvider(provider: string) {
+    await enableModelProviderInternal(this, provider);
   }
 
   async handleStartSetupWizard(mode: "local" | "remote") {

@@ -689,6 +689,12 @@ export function renderApp(state: AppViewState) {
                 onDeleteProfile: (profileId) => void state.handleDeleteModelAuthProfile(profileId),
                 onStartProviderAuth: (provider) => void state.handleStartProviderAuth(provider),
                 onStartWizard: (mode) => void state.handleStartSetupWizard(mode),
+                onDisableProvider: (provider) => void state.handleDisableModelProvider(provider),
+                onEnableProvider: (provider) => void state.handleEnableModelProvider(provider),
+                onRequestRemoveProvider: (provider) => state.handleRequestRemoveProvider(provider),
+                onCancelRemoveProvider: () => state.handleCancelRemoveProvider(),
+                onRemoveProvider: (provider) => void state.handleRemoveModelProvider(provider),
+                providerDeleteConfirmId: state.modelProviderDeleteConfirmId,
               })
             : nothing
         }

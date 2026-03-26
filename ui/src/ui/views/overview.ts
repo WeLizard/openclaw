@@ -80,6 +80,12 @@ export type OverviewProps = {
   onDeleteProfile: (profileId: string) => void;
   onStartProviderAuth: (provider?: string) => void;
   onStartWizard: (mode: "local" | "remote") => void;
+  onDisableProvider: (provider: string) => void;
+  onEnableProvider: (provider: string) => void;
+  onRequestRemoveProvider: (provider: string) => void;
+  onCancelRemoveProvider: () => void;
+  onRemoveProvider: (provider: string) => void;
+  providerDeleteConfirmId: string | null;
 };
 
 // ── Model auth helpers ──
@@ -406,13 +412,20 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
     entry.effective.kind === "profiles" && entry.profiles.length > 0
       ? t("overview.accounts.addAccount")
       : t("overview.accounts.oauthReauth");
+  const isProviderDisabled = Boolean(entry.disabled);
+  const isProviderRemoveConfirming = props.providerDeleteConfirmId === entry.provider;
+  const isProviderBusy =
+    props.modelAuthBusyKey === `disable-provider:${entry.provider}` ||
+    props.modelAuthBusyKey === `enable-provider:${entry.provider}` ||
+    props.modelAuthBusyKey === `remove-provider:${entry.provider}`;
   return html`
-    <section class="overview-auth-provider ${entry.inUse ? "overview-auth-provider--in-use" : ""}">
+    <section class="overview-auth-provider ${entry.inUse ? "overview-auth-provider--in-use" : ""} ${isProviderDisabled ? "overview-auth-provider--disabled" : ""}">
       <div class="overview-auth-provider__header">
         <div>
           <div class="overview-auth-provider__title">
             <span class="mono">${entry.provider}</span>
             ${entry.inUse ? html`<span class="chip chip-ok">${t("overview.accounts.inUse")}</span>` : nothing}
+            ${isProviderDisabled ? html`<span class="chip chip-danger">${t("overview.accounts.providerDisabled")}</span>` : nothing}
             <span class=${resolveAuthStatusChipClass(displayStatus)}>${t(`overview.accounts.status.${displayStatus}`)}</span>
           </div>
           <div class="overview-auth-provider__meta">
@@ -437,6 +450,52 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
           >
             ${t("overview.accounts.resetOrder")}
           </button>
+          ${
+            isProviderDisabled
+              ? html`<button
+                class="btn btn--sm"
+                ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                @click=${() => props.onEnableProvider(entry.provider)}
+              >
+                ${t("overview.accounts.enableProvider")}
+              </button>`
+              : html`<button
+                class="btn btn--sm"
+                ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                @click=${() => props.onDisableProvider(entry.provider)}
+              >
+                ${t("overview.accounts.disableProvider")}
+              </button>`
+          }
+          ${
+            !entry.inUse
+              ? isProviderRemoveConfirming
+                ? html`
+                  <button
+                    class="btn btn--sm"
+                    ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                    @click=${() => props.onCancelRemoveProvider()}
+                  >
+                    ${t("common.cancel")}
+                  </button>
+                  <button
+                    class="btn btn--sm danger"
+                    ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                    title=${t("overview.accounts.removeProviderConfirmTitle", { provider: entry.provider })}
+                    @click=${() => props.onRemoveProvider(entry.provider)}
+                  >
+                    ${t("overview.accounts.removeProviderConfirm")}
+                  </button>
+                `
+                : html`<button
+                  class="btn btn--sm danger"
+                  ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                  @click=${() => props.onRequestRemoveProvider(entry.provider)}
+                >
+                  ${t("overview.accounts.removeProvider")}
+                </button>`
+              : nothing
+          }
         </div>
       </div>
 

@@ -152,6 +152,12 @@ import {
   ModelsAuthStatusParamsSchema,
   type ModelsListParams,
   ModelsListParamsSchema,
+  type ModelsProviderRemoveParams,
+  ModelsProviderRemoveParamsSchema,
+  type ModelsProviderDisableParams,
+  ModelsProviderDisableParamsSchema,
+  type ModelsProviderEnableParams,
+  ModelsProviderEnableParamsSchema,
   type NodeDescribeParams,
   NodeDescribeParamsSchema,
   type NodeEventParams,
@@ -414,6 +420,12 @@ export const validateModelsAuthProfileEnableParams =
   ajv.compile<ModelsAuthProfileEnableParams>(ModelsAuthProfileEnableParamsSchema);
 export const validateModelsAuthProfileDeleteParams =
   ajv.compile<ModelsAuthProfileDeleteParams>(ModelsAuthProfileDeleteParamsSchema);
+export const validateModelsProviderRemoveParams =
+  ajv.compile<ModelsProviderRemoveParams>(ModelsProviderRemoveParamsSchema);
+export const validateModelsProviderDisableParams =
+  ajv.compile<ModelsProviderDisableParams>(ModelsProviderDisableParamsSchema);
+export const validateModelsProviderEnableParams =
+  ajv.compile<ModelsProviderEnableParams>(ModelsProviderEnableParamsSchema);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);
 export const validateToolsCatalogParams = ajv.compile<ToolsCatalogParams>(ToolsCatalogParamsSchema);
 export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBinsParamsSchema);
@@ -601,6 +613,9 @@ export {
   ModelsAuthProfileDisableParamsSchema,
   ModelsAuthProfileEnableParamsSchema,
   ModelsAuthProfileDeleteParamsSchema,
+  ModelsProviderRemoveParamsSchema,
+  ModelsProviderDisableParamsSchema,
+  ModelsProviderEnableParamsSchema,
   ModelsListParamsSchema,
   SkillsStatusParamsSchema,
   ToolsCatalogParamsSchema,
@@ -698,6 +713,9 @@ export type {
   SkillsBinsResult,
   SkillsInstallParams,
   SkillsUpdateParams,
+  ModelsProviderRemoveParams,
+  ModelsProviderDisableParams,
+  ModelsProviderEnableParams,
   NodePairRejectParams,
   NodePairVerifyParams,
   NodeListParams,

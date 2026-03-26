@@ -205,6 +205,7 @@ export type AppViewState = {
   modelAuthError: string | null;
   modelAuthStatus: ModelsAuthStatusResult | null;
   modelAuthDeleteConfirmProfileId: string | null;
+  modelProviderDeleteConfirmId: string | null;
   wizardOpen: boolean;
   wizardLoading: boolean;
   wizardBusy: boolean;
@@ -378,6 +379,11 @@ export type AppViewState = {
     handleDeleteModelAuthProfile: (profileId: string) => Promise<void>;
     requestDeleteModelAuthProfile: (profileId: string) => void;
     cancelDeleteModelAuthProfile: () => void;
+    handleRemoveModelProvider: (provider: string) => Promise<void>;
+    handleDisableModelProvider: (provider: string) => Promise<void>;
+    handleEnableModelProvider: (provider: string) => Promise<void>;
+    handleRequestRemoveProvider: (provider: string) => void;
+    handleCancelRemoveProvider: () => void;
     handleStartSetupWizard: (mode: "local" | "remote") => Promise<void>;
     handleStartProviderAuth: (provider?: string) => Promise<void>;
     handleSubmitSetupWizard: () => Promise<void>;

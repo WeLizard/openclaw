@@ -9,7 +9,7 @@ import {
 } from "../../agents/auth-profiles.js";
 import { buildAllowedModelSet, normalizeProviderId } from "../../agents/model-selection.js";
 import { getModelsAuthStatus } from "../../commands/models/auth-status.js";
-import { loadConfig } from "../../config/config.js";
+import { loadConfig, readConfigFileSnapshotForWrite, writeConfigFile } from "../../config/config.js";
 import {
   ErrorCodes,
   errorShape,
@@ -23,6 +23,9 @@ import {
   validateModelsAuthPromoteParams,
   validateModelsAuthStatusParams,
   validateModelsListParams,
+  validateModelsProviderRemoveParams,
+  validateModelsProviderDisableParams,
+  validateModelsProviderEnableParams,
 } from "../protocol/index.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
@@ -412,6 +415,208 @@ export const modelsHandlers: GatewayRequestHandlers = {
         return;
       }
       respond(true, getModelsAuthStatus(status.agentId), undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+  "models.provider.remove": async ({ params, respond }) => {
+    if (!validateModelsProviderRemoveParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid models.provider.remove params: ${formatValidationErrors(validateModelsProviderRemoveParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    try {
+      const provider = String(params.provider ?? "").trim();
+      const { snapshot, writeOptions } = await readConfigFileSnapshotForWrite();
+      const cfg = snapshot.config;
+      if (!cfg.models?.providers?.[provider]) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unknown provider "${provider}"`),
+        );
+        return;
+      }
+      // Remove the provider entry.
+      const nextProviders = { ...cfg.models.providers };
+      delete nextProviders[provider];
+
+      // Remove any fallback entries referencing this provider from agent defaults.
+      const providerPrefix = `${provider}/`;
+      const agentDefaults = cfg.agents?.defaults;
+      const patchModelList = (list: string[] | undefined): string[] | undefined => {
+        if (!list) return list;
+        const filtered = list.filter((entry) => !entry.startsWith(providerPrefix));
+        return filtered.length !== list.length ? filtered : list;
+      };
+      const nextAgentDefaults = agentDefaults
+        ? {
+            ...agentDefaults,
+            model:
+              agentDefaults.model && typeof agentDefaults.model === "object"
+                ? {
+                    ...agentDefaults.model,
+                    fallbacks: patchModelList(
+                      (agentDefaults.model as { fallbacks?: string[] }).fallbacks,
+                    ),
+                  }
+                : agentDefaults.model,
+            imageModel:
+              agentDefaults.imageModel && typeof agentDefaults.imageModel === "object"
+                ? {
+                    ...agentDefaults.imageModel,
+                    fallbacks: patchModelList(
+                      (agentDefaults.imageModel as { fallbacks?: string[] }).fallbacks,
+                    ),
+                  }
+                : agentDefaults.imageModel,
+            // Remove per-model catalog entries that belong to this provider.
+            models: agentDefaults.models
+              ? Object.fromEntries(
+                  Object.entries(agentDefaults.models).filter(
+                    ([key]) => !key.startsWith(providerPrefix),
+                  ),
+                )
+              : agentDefaults.models,
+          }
+        : agentDefaults;
+
+      // Remove auth profile config entries for this provider.
+      const nextAuthProfiles = cfg.auth?.profiles
+        ? Object.fromEntries(
+            Object.entries(cfg.auth.profiles).filter(
+              ([, profileCfg]) => profileCfg.provider !== provider,
+            ),
+          )
+        : cfg.auth?.profiles;
+
+      const nextCfg = {
+        ...cfg,
+        models: {
+          ...cfg.models,
+          providers: nextProviders,
+        },
+        agents: cfg.agents
+          ? {
+              ...cfg.agents,
+              defaults: nextAgentDefaults,
+            }
+          : cfg.agents,
+        auth: cfg.auth
+          ? {
+              ...cfg.auth,
+              profiles: nextAuthProfiles,
+            }
+          : cfg.auth,
+      };
+
+      await writeConfigFile(nextCfg, writeOptions);
+
+      // Also delete all auth profiles for this provider from auth-profiles.json.
+      const status = getModelsAuthStatus(undefined);
+      const providerEntry = status.providers.find((entry) => entry.provider === provider);
+      if (providerEntry) {
+        for (const profile of providerEntry.profiles) {
+          await deleteAuthProfile({
+            agentDir: status.agentDir,
+            profileId: profile.profileId,
+          });
+        }
+      }
+
+      respond(true, { ok: true, provider }, undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+  "models.provider.disable": async ({ params, respond }) => {
+    if (!validateModelsProviderDisableParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid models.provider.disable params: ${formatValidationErrors(validateModelsProviderDisableParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    try {
+      const provider = String(params.provider ?? "").trim();
+      const { snapshot, writeOptions } = await readConfigFileSnapshotForWrite();
+      const cfg = snapshot.config;
+      if (!cfg.models?.providers?.[provider]) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unknown provider "${provider}"`),
+        );
+        return;
+      }
+      const nextCfg = {
+        ...cfg,
+        models: {
+          ...cfg.models,
+          providers: {
+            ...cfg.models.providers,
+            [provider]: {
+              ...cfg.models.providers[provider],
+              disabled: true,
+            },
+          },
+        },
+      };
+      await writeConfigFile(nextCfg, writeOptions);
+      respond(true, getModelsAuthStatus(undefined), undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+  "models.provider.enable": async ({ params, respond }) => {
+    if (!validateModelsProviderEnableParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid models.provider.enable params: ${formatValidationErrors(validateModelsProviderEnableParams.errors)}`,
+        ),
+      );
+      return;
+    }
+    try {
+      const provider = String(params.provider ?? "").trim();
+      const { snapshot, writeOptions } = await readConfigFileSnapshotForWrite();
+      const cfg = snapshot.config;
+      if (!cfg.models?.providers?.[provider]) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, `unknown provider "${provider}"`),
+        );
+        return;
+      }
+      const nextProvider = { ...cfg.models.providers[provider] };
+      // Remove the disabled flag entirely when enabling.
+      delete nextProvider.disabled;
+      const nextCfg = {
+        ...cfg,
+        models: {
+          ...cfg.models,
+          providers: {
+            ...cfg.models.providers,
+            [provider]: nextProvider,
+          },
+        },
+      };
+      await writeConfigFile(nextCfg, writeOptions);
+      respond(true, getModelsAuthStatus(undefined), undefined);
     } catch (err) {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
     }

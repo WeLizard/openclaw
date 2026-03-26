@@ -126,3 +126,21 @@ export async function deleteModelAuthProfile(state: ModelAuthState, profileId: s
     { profileId },
   );
 }
+
+export async function removeModelProvider(state: ModelAuthState, provider: string) {
+  await runModelAuthAction(state, `remove-provider:${provider}`, "models.provider.remove", {
+    provider,
+  });
+}
+
+export async function disableModelProvider(state: ModelAuthState, provider: string) {
+  await runModelAuthAction(state, `disable-provider:${provider}`, "models.provider.disable", {
+    provider,
+  });
+}
+
+export async function enableModelProvider(state: ModelAuthState, provider: string) {
+  await runModelAuthAction(state, `enable-provider:${provider}`, "models.provider.enable", {
+    provider,
+  });
+}
