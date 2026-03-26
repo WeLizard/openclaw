@@ -171,6 +171,12 @@ async function refreshOAuthTokenWithLock(params: {
       context: cred,
     });
     if (pluginRefreshed) {
+      store.profiles[params.profileId] = {
+        ...cred,
+        ...pluginRefreshed,
+        type: "oauth",
+      };
+      saveAuthProfileStore(store, params.agentDir);
       return {
         apiKey: await buildOAuthApiKey(cred.provider, pluginRefreshed),
         newCredentials: pluginRefreshed,
