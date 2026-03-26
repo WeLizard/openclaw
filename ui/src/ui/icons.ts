@@ -433,6 +433,19 @@ export const icons = {
       <circle cx="18" cy="12" r="1.5" />
     </svg>
   `,
+  power: html`
+    <svg viewBox="0 0 24 24">
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <line x1="12" x2="12" y1="2" y2="12" />
+    </svg>
+  `,
+  trash: html`
+    <svg viewBox="0 0 24 24">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  `,
   arrowUpDown: html`
     <svg viewBox="0 0 24 24">
       <path d="m21 16-4 4-4-4" />

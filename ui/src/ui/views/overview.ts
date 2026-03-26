@@ -450,23 +450,15 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
           >
             ${t("overview.accounts.resetOrder")}
           </button>
-          ${
-            isProviderDisabled
-              ? html`<button
-                class="btn btn--sm"
-                ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
-                @click=${() => props.onEnableProvider(entry.provider)}
-              >
-                ${t("overview.accounts.enableProvider")}
-              </button>`
-              : html`<button
-                class="btn btn--sm"
-                ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
-                @click=${() => props.onDisableProvider(entry.provider)}
-              >
-                ${t("overview.accounts.disableProvider")}
-              </button>`
-          }
+          <button
+            class="btn btn--sm btn--icon ${isProviderDisabled ? "" : "active"}"
+            ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+            title=${isProviderDisabled ? t("overview.accounts.enableProvider") : t("overview.accounts.disableProvider")}
+            style="opacity: ${isProviderDisabled ? "0.5" : "1"}"
+            @click=${() => isProviderDisabled ? props.onEnableProvider(entry.provider) : props.onDisableProvider(entry.provider)}
+          >
+            ${icons.power}
+          </button>
           ${
             !entry.inUse
               ? isProviderRemoveConfirming
@@ -479,20 +471,21 @@ function renderAuthProviderCard(entry: ModelsAuthProviderStatus, props: Overview
                     ${t("common.cancel")}
                   </button>
                   <button
-                    class="btn btn--sm danger"
+                    class="btn btn--sm btn--icon danger"
                     ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
                     title=${t("overview.accounts.removeProviderConfirmTitle", { provider: entry.provider })}
                     @click=${() => props.onRemoveProvider(entry.provider)}
                   >
-                    ${t("overview.accounts.removeProviderConfirm")}
+                    ${icons.trash}
                   </button>
                 `
                 : html`<button
-                  class="btn btn--sm danger"
+                  class="btn btn--sm btn--icon danger"
                   ?disabled=${Boolean(props.modelAuthBusyKey) || isProviderBusy}
+                  title=${t("overview.accounts.removeProvider")}
                   @click=${() => props.onRequestRemoveProvider(entry.provider)}
                 >
-                  ${t("overview.accounts.removeProvider")}
+                  ${icons.trash}
                 </button>`
               : nothing
           }
